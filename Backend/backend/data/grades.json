@@ -1,0 +1,57 @@
+{
+  "grades": [
+    {
+      "code": "C5",
+      "name": "Premium",
+      "description": "Highest quality cinnamon with tight quills",
+      "characteristics": [
+        "Color: Light golden to medium brown",
+        "Quill diameter: 6-8mm",
+        "Breakage: Less than 5%",
+        "Moisture: 8-12%"
+      ]
+    },
+    {
+      "code": "C4",
+      "name": "Grade A",
+      "description": "High quality cinnamon suitable for export",
+      "characteristics": [
+        "Color: Golden to medium brown",
+        "Quill diameter: 5-7mm",
+        "Breakage: 5-15%",
+        "Moisture: 8-13%"
+      ]
+    },
+    {
+      "code": "H2",
+      "name": "Grade B",
+      "description": "Acceptable quality for processing and local markets",
+      "characteristics": [
+        "Color: Medium to dark brown",
+        "Quill diameter: 4-6mm",
+        "Breakage: 15-30%",
+        "Moisture: 8-14%"
+      ]
+    }
+  ],
+  "quality_levels": {
+    "Premium": {
+      "price_range": "5000-6000",
+      "market": "Export and premium buyers",
+      "temperature_range": "30-35°C",
+      "weight_loss_range": "18-22%"
+    },
+    "Grade A": {
+      "price_range": "3200-4000",
+      "market": "Regional wholesale and retail",
+      "temperature_range": "27-38°C",
+      "weight_loss_range": "14-26%"
+    },
+    "Grade B": {
+      "price_range": "1800-2500",
+      "market": "Processing and local markets",
+      "temperature_range": "<27°C or >38°C",
+      "weight_loss_range": "<14% or >26%"
+    }
+  }
+}
