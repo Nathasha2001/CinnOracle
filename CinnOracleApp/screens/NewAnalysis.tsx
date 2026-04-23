@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,687 +9,683 @@ import {
   StatusBar,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RootStackParamList } from '../App';
-import { predictQuality, QualityPredictionInput } from '../src/api/client';
+import { predictCinnOracle, CinnOraclePredictRequest } from '../src/api/client';
+import AppBottomNav from '../components/AppBottomNav';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type UserType = 'Farmer Level' | 'Large Scale';
+type ToolType = 'With Tool' | 'Without Tool';
+type ColorType = 'Light Brown' | 'Golden Brown' | 'Dark Brown';
+type MouldType = 'Yes' | 'No';
+type DayTemperature = {
+  morning: string;
+  noon: string;
+  evening: string;
+};
 
 export default function NewAnalysis() {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [weightBefore, setWeightBefore] = useState<string>('');
-  const [weightAfter, setWeightAfter] = useState<string>('');
-  const [temperature, setTemperature] = useState<string>('');
-  const [dryingDays, setDryingDays] = useState<string>('');
+  const navigation = useNavigation<NavigationProp>();
 
-  const [cinnamonColor, setCinnamonColor] = useState<
-    'Light Golden' | 'Golden Brown' | 'Dark Brown'
-  >('Golden Brown');
-  const [breakageLevel, setBreakageLevel] = useState<'Low' | 'Medium' | 'High'>(
-    'Low'
-  );
-  const [rollTightness, setRollTightness] = useState<
-    'Tight' | 'Medium' | 'Loose'
-  >('Medium');
-  const [aromaStrength, setAromaStrength] = useState<
-    'Strong' | 'Medium' | 'Weak'
-  >('Strong');
+  const [userType, setUserType] = useState<UserType>('Farmer Level');
+  const [toolType, setToolType] = useState<ToolType>('Without Tool');
+  const [weightBefore, setWeightBefore] = useState('');
+  const [weightAfter, setWeightAfter] = useState('');
+  const [moistureInput, setMoistureInput] = useState('');
+  const [diameter, setDiameter] = useState('');
+  const [dryingDays, setDryingDays] = useState('2');
+  const [temperatureDays, setTemperatureDays] = useState<DayTemperature[]>([
+    { morning: '', noon: '', evening: '' },
+    { morning: '', noon: '', evening: '' },
+  ]);
+  const [color, setColor] = useState<ColorType>('Golden Brown');
+  const [visualMould, setVisualMould] = useState<MouldType>('No');
+  const [district, setDistrict] = useState('Galle');
+  const [harvestQuantityKg, setHarvestQuantityKg] = useState('100');
+  const [showDistrictModal, setShowDistrictModal] = useState(false);
 
-  const formatNumber = (value: string): string => {
-    // Remove commas and non-numeric characters
-    const numValue = value.replace(/[^0-9]/g, '');
-    if (numValue === '') return '';
-    // Add commas for thousands
-    return parseInt(numValue, 10).toLocaleString();
-  };
+  const DISTRICTS = [
+    'Badulla',
+    'Galle',
+    'Hambantota',
+    'Gampaha',
+    'Ratnapura',
+    'Colombo',
+    'Matara',
+    'Monaragala',
+    'Kurunegala',
+  ];
 
-  const parseNumber = (value: string): number => {
-    const numValue = value.replace(/[^0-9]/g, '');
-    return numValue === '' ? 0 : parseInt(numValue, 10);
-  };
-
-  const increment = (currentValue: string, setValue: (value: string) => void) => {
-    const num = parseNumber(currentValue);
-    setValue(formatNumber((num + 1).toString()));
-  };
-
-  const decrement = (currentValue: string, setValue: (value: string) => void) => {
-    const num = parseNumber(currentValue);
-    if (num > 0) {
-      setValue(formatNumber((num - 1).toString()));
+  useEffect(() => {
+    // Large scale users always have moisture tool,
+    // so tool option should not be shown/used.
+    if (userType === 'Large Scale') {
+      setToolType('With Tool');
     }
+  }, [userType]);
+
+  const formatNumericInput = (value: string) => value.replace(/[^\d.]/g, '');
+  const toNumber = (value: string) => {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : 0;
   };
 
-  const handleWeightBeforeChange = (text: string) => {
-    setWeightBefore(formatNumber(text));
+  const dryingDaysNum = Math.max(1, Math.min(14, Math.floor(toNumber(dryingDays) || 0)));
+  const estimatedMoisture = useMemo(() => {
+    const before = toNumber(weightBefore);
+    const after = toNumber(weightAfter);
+    if (before <= 0 || after < 0 || after > before) return null;
+    return Number((((before - after) / before) * 100).toFixed(1));
+  }, [weightBefore, weightAfter]);
+
+  const syncTemperatureDays = (nextDays: number) => {
+    setTemperatureDays((prev) => {
+      const normalized = [...prev];
+      if (normalized.length < nextDays) {
+        while (normalized.length < nextDays) {
+          normalized.push({ morning: '', noon: '', evening: '' });
+        }
+      } else if (normalized.length > nextDays) {
+        normalized.length = nextDays;
+      }
+      return normalized;
+    });
   };
 
-  const handleWeightAfterChange = (text: string) => {
-    setWeightAfter(formatNumber(text));
+  const onChangeDryingDays = (value: string) => {
+    const cleaned = formatNumericInput(value);
+    setDryingDays(cleaned);
+    const nextDays = Math.max(1, Math.min(14, Math.floor(toNumber(cleaned) || 0)));
+    syncTemperatureDays(nextDays);
   };
 
-  const handleTemperatureChange = (text: string) => {
-    setTemperature(formatNumber(text));
+  const averageTemperature = useMemo(() => {
+    const values = temperatureDays
+      .flatMap((d) => [toNumber(d.morning), toNumber(d.noon), toNumber(d.evening)])
+      .filter((v) => v > 0);
+    if (values.length === 0) return 0;
+    return Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1));
+  }, [temperatureDays]);
+
+  const dayAverage = (day: DayTemperature) => {
+    const values = [toNumber(day.morning), toNumber(day.noon), toNumber(day.evening)].filter(
+      (v) => v > 0,
+    );
+    if (values.length === 0) return 0;
+    return Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1));
   };
 
-  const handleDryingDaysChange = (text: string) => {
-    setDryingDays(formatNumber(text));
+  const validate = () => {
+    if (!diameter || toNumber(diameter) <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid diameter.');
+      return false;
+    }
+    if (!harvestQuantityKg || toNumber(harvestQuantityKg) <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid harvest quantity (kg).');
+      return false;
+    }
+    if (!dryingDays || toNumber(dryingDays) <= 0) {
+      Alert.alert('Validation Error', 'Please enter valid drying days.');
+      return false;
+    }
+    const hasInvalidTemp = temperatureDays.some(
+      (d) => toNumber(d.morning) <= 0 || toNumber(d.noon) <= 0 || toNumber(d.evening) <= 0,
+    );
+    if (hasInvalidTemp) {
+      Alert.alert('Validation Error', 'Please enter temperature for every drying day.');
+      return false;
+    }
+
+    if (userType === 'Farmer Level' && toolType === 'Without Tool') {
+      const before = toNumber(weightBefore);
+      const after = toNumber(weightAfter);
+      if (before <= 0 || after <= 0) {
+        Alert.alert('Validation Error', 'Please enter weight before and weight after drying.');
+        return false;
+      }
+      if (after >= before) {
+        Alert.alert('Validation Error', 'Weight after drying must be less than weight before drying.');
+        return false;
+      }
+    } else {
+      if (!moistureInput || toNumber(moistureInput) <= 0) {
+        Alert.alert('Validation Error', 'Please enter moisture percentage.');
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const handlePredict = async () => {
-    const weightBeforeNum = parseNumber(weightBefore);
-    const weightAfterNum = parseNumber(weightAfter);
-    const temperatureNum = parseNumber(temperature);
-    const dryingDaysNum = parseNumber(dryingDays);
+    if (!validate()) return;
 
-    // Validate inputs
-    if (weightBeforeNum === 0 || weightAfterNum === 0 || temperatureNum === 0) {
-      Alert.alert('Validation Error', 'Please fill in all required fields');
-      return;
+    const backendUserType = userType === 'Large Scale' ? 'large_scale' : 'farmer';
+    const moistureMode: 'weights' | 'moisture_tool' | undefined =
+      userType === 'Farmer Level'
+        ? toolType === 'Without Tool'
+          ? 'weights'
+          : 'moisture_tool'
+        : undefined;
+
+    const moisturePercent =
+      userType === 'Farmer Level' && toolType === 'Without Tool'
+        ? estimatedMoisture ?? 0
+        : toNumber(moistureInput);
+
+    const wBefore = toNumber(weightBefore);
+    const wAfter = toNumber(weightAfter);
+
+    const temperature_readings = temperatureDays.slice(0, dryingDaysNum).map((day, idx) => ({
+      day: idx + 1,
+      temp_8am: toNumber(day.morning),
+      temp_12pm: toNumber(day.noon),
+      temp_6pm: toNumber(day.evening),
+    }));
+
+    const payload: CinnOraclePredictRequest = {
+      user_type: backendUserType,
+      diameter_mm: toNumber(diameter),
+      drying_days: dryingDaysNum,
+      temperature_readings,
+      color,
+      visual_mould: visualMould,
+      district,
+      harvest_quantity_kg: toNumber(harvestQuantityKg),
+      farmer_moisture_mode: moistureMode,
+    };
+
+    if (backendUserType === 'farmer') {
+      if (moistureMode === 'weights') {
+        payload.weight_before_drying_kg = wBefore;
+        payload.weight_after_drying_kg = wAfter;
+        payload.moisture_percentage = null;
+      } else {
+        payload.weight_before_drying_kg = null;
+        payload.weight_after_drying_kg = null;
+        payload.moisture_percentage = toNumber(moistureInput);
+      }
+    } else {
+      payload.moisture_percentage = toNumber(moistureInput);
+      payload.weight_before_drying_kg = null;
+      payload.weight_after_drying_kg = null;
     }
 
-    // Weight after drying must be lower than or equal to weight before drying
-    if (weightAfterNum > weightBeforeNum) {
-      Alert.alert(
-        'Validation Error',
-        'Weight after drying must be lower than or equal to weight before drying',
-      );
-      return;
-    }
+    const harvestDateIso = new Date().toISOString();
 
     try {
-      // Call the quality prediction API
-      const qualityInput: QualityPredictionInput = {
-        weight_before: weightBeforeNum,
-        weight_after: weightAfterNum,
-        temperature: temperatureNum,
-        drying_days: dryingDaysNum,
-        color: cinnamonColor,
-        breakage_level: breakageLevel,
-        roll_tightness: rollTightness,
-        aroma_strength: aromaStrength,
-      };
-
-      const qualityResponse = await predictQuality(qualityInput);
-
-      // Calculate weight loss for display
-      const weightLoss = ((weightBeforeNum - weightAfterNum) / weightBeforeNum) * 100;
-
-      // Generate batch ID
+      const prediction = await predictCinnOracle(payload);
       const batchId = `#${Math.floor(Math.random() * 9000) + 1000}`;
-      const district = 'Galle';
-      const harvestDate = new Date().toISOString();
 
-      // include selling meta for backend save
-      qualityInput.district = district;
-      qualityInput.harvest_date = harvestDate;
+      const displayWeightBefore =
+        backendUserType === 'farmer' && moistureMode === 'weights' ? wBefore : 100;
+      const displayWeightAfter =
+        backendUserType === 'farmer' && moistureMode === 'weights'
+          ? wAfter
+          : Math.max(0, 100 - toNumber(moistureInput));
+
+      const weightLossPercent =
+        displayWeightBefore > 0
+          ? Number((((displayWeightBefore - displayWeightAfter) / displayWeightBefore) * 100).toFixed(2))
+          : 0;
 
       navigation.navigate('PricePrediction', {
         result: {
-          quality: qualityResponse.standard_grade,
-          qualityLevel: qualityResponse.quality,
-          standardGrade: qualityResponse.standard_grade,
-          weight_loss_percent: qualityResponse.weight_loss_percent,
-          batchId: batchId,
-          district,
-          harvestDate,
+          // legacy fields
+          quality: prediction.predicted_grade,
+          qualityLevel: prediction.predicted_grade,
+          standardGrade: prediction.predicted_grade,
+          weight_loss_percent: weightLossPercent,
+          batchId,
+          district: prediction.district,
+          harvestDate: harvestDateIso,
+          // new unified fields
+          predictedPricePerKg: prediction.predicted_price_per_kg,
+          estimatedTotalIncome: prediction.estimated_total_income,
+          recommendedMarketplaces: prediction.recommended_marketplaces,
+          calculatedValues: prediction.calculated_values,
           inputs: {
-            weightBefore: weightBeforeNum,
-            weightAfter: weightAfterNum,
-            temperature: temperatureNum,
+            weightBefore: displayWeightBefore,
+            weightAfter: displayWeightAfter,
+            temperature: averageTemperature,
             dryingDays: dryingDaysNum,
-            cinnamonColor,
-            breakageLevel,
-            rollTightness,
-            aromaStrength,
+            cinnamonColor: color,
+            visualMould,
+            moisture: moisturePercent,
+            moistureMode: moistureMode ?? 'moisture_tool',
+            diameter: toNumber(diameter),
+            harvestQuantityKg: toNumber(harvestQuantityKg),
+            temperatureReadings: temperature_readings,
           },
         },
       });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to predict quality. Please try again.');
-      console.error('Quality prediction error:', error);
+    } catch (error: any) {
+      console.error('Prediction error:', error);
+      Alert.alert('Error', error?.message || 'Failed to run prediction. Please try again.');
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
-      {/* Top Header Bar */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.headerIcon}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#000000" />
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Harvest Analysis</Text>
-        <TouchableOpacity 
-          style={styles.headerIcon}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="close" size={24} color="#000000" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Predict Your Cinnamon Quality</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Main Content */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.sectionTitle}>Measured Details</Text>
-
-        {/* Weight Before Drying Card */}
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>Weight Before Drying</Text>
-          <View style={styles.inputContainer}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.sectionTag}>1. Select User Type</Text>
+        <View style={styles.row}>
+          {(['Farmer Level', 'Large Scale'] as UserType[]).map((type) => (
             <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => decrement(weightBefore, setWeightBefore)}
+              key={type}
+              style={[styles.optionCard, userType === type && styles.optionCardActive]}
+              onPress={() => setUserType(type)}
             >
-              <MaterialIcons name="remove" size={20} color="#FFFFFF" />
+              <Text style={[styles.optionTitle, userType === type && styles.optionTitleActive]}>
+                {type}
+              </Text>
             </TouchableOpacity>
-
-            <View style={[styles.inputField, styles.inputFieldEmpty]}>
-              <TextInput
-                style={styles.inputText}
-                value={weightBefore}
-                onChangeText={handleWeightBeforeChange}
-                keyboardType="numeric"
-                placeholder=""
-              />
-              {weightBefore === '' ? (
-                <View style={[styles.placeholderOverlay, { pointerEvents: 'none' }]}>
-                  <Text style={styles.inputPlaceholder}>(kg)</Text>
-                </View>
-              ) : (
-                <Text style={styles.inputUnit}>(kg)</Text>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => increment(weightBefore, setWeightBefore)}
-            >
-              <MaterialIcons name="add" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+          ))}
         </View>
 
-        {/* Weight After Drying Card */}
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>Weight After Drying</Text>
-          <View style={styles.inputContainer}>
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => decrement(weightAfter, setWeightAfter)}
-            >
-              <MaterialIcons name="remove" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <View style={[styles.inputField, styles.inputFieldEmpty]}>
-              <TextInput
-                style={styles.inputText}
-                value={weightAfter}
-                onChangeText={handleWeightAfterChange}
-                keyboardType="numeric"
-                placeholder=""
-              />
-              {weightAfter === '' ? (
-                <View style={[styles.placeholderOverlay, { pointerEvents: 'none' }]}>
-                  <Text style={styles.inputPlaceholder}>(kg)</Text>
-                </View>
-              ) : (
-                <Text style={styles.inputUnit}>(kg)</Text>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => increment(weightAfter, setWeightAfter)}
-            >
-              <MaterialIcons name="add" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Temperature Card */}
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>Drying Temperature</Text>
-          <View style={styles.inputContainer}>
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => decrement(temperature, setTemperature)}
-            >
-              <MaterialIcons name="remove" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <View style={[styles.inputField, styles.inputFieldEmpty]}>
-              <TextInput
-                style={styles.inputText}
-                value={temperature}
-                onChangeText={handleTemperatureChange}
-                keyboardType="numeric"
-                placeholder=""
-              />
-              {temperature === '' ? (
-                <View style={[styles.placeholderOverlay, { pointerEvents: 'none' }]}>
-                  <Text style={styles.inputPlaceholder}>(°C)</Text>
-                </View>
-              ) : (
-                <Text style={styles.inputUnit}>(°C)</Text>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => increment(temperature, setTemperature)}
-            >
-              <MaterialIcons name="add" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Drying Days Card */}
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>Drying Days</Text>
-          <View style={styles.inputContainer}>
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => decrement(dryingDays, setDryingDays)}
-            >
-              <MaterialIcons name="remove" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <View style={[styles.inputField, styles.inputFieldEmpty]}>
-              <TextInput
-                style={styles.inputText}
-                value={dryingDays}
-                onChangeText={handleDryingDaysChange}
-                keyboardType="numeric"
-                placeholder=""
-              />
-              {dryingDays === '' ? (
-                <View style={[styles.placeholderOverlay, { pointerEvents: 'none' }]}>
-                  <Text style={styles.inputPlaceholder}>(days)</Text>
-                </View>
-              ) : (
-                <Text style={styles.inputUnit}>(days)</Text>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => increment(dryingDays, setDryingDays)}
-            >
-              <MaterialIcons name="add" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Harvest Condition</Text>
-
-        <View style={styles.conditionCard}>
-          <View style={styles.conditionGroup}>
-            <Text style={styles.conditionLabel}>Cinnamon Color</Text>
-            <View style={styles.chipRow}>
-              {['Light Golden', 'Golden Brown', 'Dark Brown'].map(option => (
+        {userType !== 'Large Scale' && (
+          <>
+            <Text style={styles.sectionTag}>2. Moisture (Select Option)</Text>
+            <View style={styles.row}>
+              {(['With Tool', 'Without Tool'] as ToolType[]).map((type) => (
                 <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.chip,
-                    cinnamonColor === option && styles.chipSelected,
-                  ]}
-                  onPress={() =>
-                    setCinnamonColor(
-                      option as 'Light Golden' | 'Golden Brown' | 'Dark Brown'
-                    )
-                  }
+                  key={type}
+                  style={[styles.optionCard, toolType === type && styles.optionCardActive]}
+                  onPress={() => setToolType(type)}
                 >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      cinnamonColor === option && styles.chipTextSelected,
-                    ]}
-                  >
-                    {option}
+                  <Text style={[styles.optionTitle, toolType === type && styles.optionTitleActive]}>
+                    {type}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </>
+        )}
 
-          <View style={styles.conditionGroup}>
-            <Text style={styles.conditionLabel}>Breakage Level</Text>
-            <View style={styles.chipRow}>
-              {['Low', 'Medium', 'High'].map(option => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.chip,
-                    breakageLevel === option && styles.chipSelected,
-                  ]}
-                  onPress={() =>
-                    setBreakageLevel(option as 'Low' | 'Medium' | 'High')
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      breakageLevel === option && styles.chipTextSelected,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        {userType === 'Farmer Level' && toolType === 'Without Tool' ? (
+          <View style={styles.card}>
+            <Text style={styles.label}>Weight Before Drying (kg)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={weightBefore}
+              onChangeText={(v) => setWeightBefore(formatNumericInput(v))}
+              placeholder="Enter weight before drying"
+            />
+            <Text style={styles.label}>Weight After Drying (kg)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={weightAfter}
+              onChangeText={(v) => setWeightAfter(formatNumericInput(v))}
+              placeholder="Enter weight after drying"
+            />
+            {estimatedMoisture !== null && (
+              <>
+                <Text style={styles.label}>Moisture Percentage (%)</Text>
+                <View style={styles.readOnlyBox}>
+                  <Text style={styles.readOnlyText}>{estimatedMoisture}%</Text>
+                </View>
+              </>
+            )}
           </View>
-
-          <View style={styles.conditionGroup}>
-            <Text style={styles.conditionLabel}>Roll Tightness</Text>
-            <View style={styles.chipRow}>
-              {['Tight', 'Medium', 'Loose'].map(option => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.chip,
-                    rollTightness === option && styles.chipSelected,
-                  ]}
-                  onPress={() =>
-                    setRollTightness(option as 'Tight' | 'Medium' | 'Loose')
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      rollTightness === option && styles.chipTextSelected,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.label}>Moisture Percentage (%)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={moistureInput}
+              onChangeText={(v) => setMoistureInput(formatNumericInput(v))}
+              placeholder="Enter moisture percentage"
+            />
           </View>
+        )}
 
-          <View style={styles.conditionGroup}>
-            <Text style={styles.conditionLabel}>Aroma Strength</Text>
-            <View style={styles.chipRow}>
-              {['Strong', 'Medium', 'Weak'].map(option => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.chip,
-                    aromaStrength === option && styles.chipSelected,
-                  ]}
-                  onPress={() =>
-                    setAromaStrength(option as 'Strong' | 'Medium' | 'Weak')
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      aromaStrength === option && styles.chipTextSelected,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        <View style={styles.card}>
+          <Text style={styles.sectionTag}>3. Cinnamon Details</Text>
+          <Text style={styles.label}>Diameter (mm)</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={diameter}
+            onChangeText={(v) => setDiameter(formatNumericInput(v))}
+            placeholder="Enter diameter"
+          />
+
+          <Text style={styles.label}>Drying Days</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={dryingDays}
+            onChangeText={onChangeDryingDays}
+            placeholder="Enter drying days"
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTag}>4. Temperature (°C)</Text>
+          <View style={styles.tempHeaderRow}>
+            <Text style={styles.tempHeaderDay}>Day</Text>
+            <Text style={styles.tempHeaderCol}>8 AM</Text>
+            <Text style={styles.tempHeaderCol}>12 PM</Text>
+            <Text style={styles.tempHeaderCol}>6 PM</Text>
+            <Text style={styles.tempHeaderAvg}>Average</Text>
+          </View>
+          {temperatureDays.map((value, idx) => (
+            <View key={`day-${idx}`} style={styles.tempRow}>
+              <Text style={styles.dayLabel}>Day {idx + 1}</Text>
+              <TextInput
+                style={[styles.input, styles.tempInput]}
+                keyboardType="numeric"
+                value={value.morning}
+                onChangeText={(v) =>
+                  setTemperatureDays((prev) => {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx], morning: formatNumericInput(v) };
+                    return next;
+                  })
+                }
+                placeholder="°C"
+              />
+              <TextInput
+                style={[styles.input, styles.tempInput]}
+                keyboardType="numeric"
+                value={value.noon}
+                onChangeText={(v) =>
+                  setTemperatureDays((prev) => {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx], noon: formatNumericInput(v) };
+                    return next;
+                  })
+                }
+                placeholder="°C"
+              />
+              <TextInput
+                style={[styles.input, styles.tempInput]}
+                keyboardType="numeric"
+                value={value.evening}
+                onChangeText={(v) =>
+                  setTemperatureDays((prev) => {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx], evening: formatNumericInput(v) };
+                    return next;
+                  })
+                }
+                placeholder="°C"
+              />
+              <Text style={styles.dayAvgValue}>{dayAverage(value) > 0 ? `${dayAverage(value)}°C` : '—'}</Text>
             </View>
+          ))}
+          <Text style={styles.avgText}>
+            Overall Average Temperature: {averageTemperature > 0 ? `${averageTemperature} °C` : 'Auto calculated'}
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTag}>5. Color</Text>
+          <View style={styles.rowWrap}>
+            {(['Light Brown', 'Golden Brown', 'Dark Brown'] as ColorType[]).map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.chip, color === c && styles.chipActive]}
+                onPress={() => setColor(c)}
+              >
+                <Text style={[styles.chipText, color === c && styles.chipTextActive]}>{c}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Analyze Button */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTag}>6. Visual Mould</Text>
+          <View style={styles.row}>
+            {(['Yes', 'No'] as MouldType[]).map((m) => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.optionCard, visualMould === m && styles.optionCardActive]}
+                onPress={() => setVisualMould(m)}
+              >
+                <Text style={[styles.optionTitle, visualMould === m && styles.optionTitleActive]}>
+                  {m}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTag}>7. District</Text>
+          <TouchableOpacity
+            style={[styles.input, styles.dropdownInput]}
+            onPress={() => setShowDistrictModal(true)}
+          >
+            <Text style={styles.dropdownText}>{district || 'Select district'}</Text>
+            <MaterialIcons name="arrow-drop-down" size={22} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTag}>8. Harvest quantity</Text>
+          <Text style={styles.label}>Total harvest quantity (kg)</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={harvestQuantityKg}
+            onChangeText={(v) => setHarvestQuantityKg(formatNumericInput(v))}
+            placeholder="e.g. 100"
+          />
+        </View>
+
         <TouchableOpacity style={styles.predictButton} onPress={handlePredict}>
-          <Text style={styles.predictButtonText}>Analyze Harvest</Text>
+          <Text style={styles.predictText}>Predict</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('CinnOracleMain')}
-        >
-          <MaterialIcons name="home" size={24} color="#9E9E9E" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
-
-        <View style={[styles.navItem, styles.navItemActive]}>
-          <MaterialIcons name="analytics" size={24} color="#FFFFFF" />
-          <Text style={[styles.navLabel, styles.navLabelActive]}>Analysis</Text>
+      <Modal
+        visible={showDistrictModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDistrictModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select District</Text>
+              <TouchableOpacity onPress={() => setShowDistrictModal(false)}>
+                <MaterialIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {DISTRICTS.map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={styles.modalOption}
+                  onPress={() => {
+                    setDistrict(d);
+                    setShowDistrictModal(false);
+                  }}
+                >
+                  <Text style={styles.modalOptionText}>{d}</Text>
+                  {district === d && (
+                    <MaterialIcons name="check" size={20} color="#2E7D32" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </View>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('HistoricalTrends')}
-        >
-          <MaterialIcons name="history" size={24} color="#9E9E9E" />
-          <Text style={styles.navLabel}>History</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialIcons name="settings" size={24} color="#9E9E9E" />
-          <Text style={styles.navLabel}>Settings</Text>
-        </TouchableOpacity>
-      </View>
+      </Modal>
+      <AppBottomNav active="predict" />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  headerIcon: {
-    padding: 4,
-    width: 32,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4CAF50',
-    marginBottom: 8,
-  },
-  inputCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 12,
-    fontWeight: '500',
-  },
-  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  controlButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerTitle: { fontSize: 16, fontWeight: '700', color: '#1E1E1E' },
+  content: { padding: 16, paddingBottom: 28 },
+  sectionTag: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4E342E',
+    marginBottom: 10,
   },
-  inputField: {
+  row: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  optionCard: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    minHeight: 52,
-    position: 'relative',
+    paddingHorizontal: 12,
   },
-  inputFieldFilled: {
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    backgroundColor: '#FFFFFF',
-  },
-  inputFieldEmpty: {
-    backgroundColor: '#E8F5E9',
-    borderWidth: 0,
-  },
-  inputText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    textAlign: 'center',
-    padding: 0,
-    flex: 1,
-  },
-  inputUnit: {
-    fontSize: 14,
-    color: '#999999',
-    marginLeft: 6,
-  },
-  placeholderOverlay: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  },
-  inputPlaceholder: {
-    fontSize: 14,
-    color: '#CCCCCC',
-  },
-  conditionCard: {
+  optionCardActive: { borderColor: '#2E7D32', backgroundColor: '#F1F8E9' },
+  optionTitle: { fontSize: 14, fontWeight: '600', color: '#424242', textAlign: 'center' },
+  optionTitleActive: { color: '#2E7D32' },
+  card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    padding: 12,
+    marginBottom: 12,
   },
-  conditionGroup: {
-    marginBottom: 16,
-  },
-  conditionLabel: {
+  label: { fontSize: 13, color: '#616161', marginBottom: 6, marginTop: 4 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D7D7D7',
+    borderRadius: 8,
+    backgroundColor: '#FAFAFA',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 14,
-    color: '#666666',
     marginBottom: 8,
-    fontWeight: '500',
+    color: '#1E1E1E',
   },
-  chipRow: {
+  dropdownInput: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  chip: {
-    flex: 1,
-    paddingVertical: 10,
+  dropdownText: {
+    fontSize: 14,
+    color: '#1E1E1E',
+  },
+  readOnlyBox: {
+    borderWidth: 1,
+    borderColor: '#D7D7D7',
+    borderRadius: 8,
+    backgroundColor: '#F5FFF7',
     paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: '#E8F5E9',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  chipSelected: {
-    backgroundColor: '#4CAF50',
-  },
-  chipText: {
-    fontSize: 12,
-    color: '#388E3C',
-    fontWeight: '500',
-  },
-  chipTextSelected: {
-    color: '#FFFFFF',
-  },
-  predictButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  predictButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
     paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    marginBottom: 8,
   },
-  navItem: {
-    padding: 8,
+  readOnlyText: { color: '#2E7D32', fontSize: 14, fontWeight: '700' },
+  tempRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  tempHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 6,
   },
-  navLabel: {
-    fontSize: 10,
-    color: '#9E9E9E',
-    marginTop: 2,
+  tempHeaderDay: { width: 42, fontSize: 11, color: '#757575', fontWeight: '700' },
+  tempHeaderCol: { flex: 1, fontSize: 11, color: '#757575', fontWeight: '700', textAlign: 'center' },
+  tempHeaderAvg: { width: 64, fontSize: 11, color: '#757575', fontWeight: '700', textAlign: 'center' },
+  dayLabel: { width: 42, fontSize: 12, color: '#555' },
+  tempInput: {
+    flex: 1,
+    marginBottom: 0,
+    paddingHorizontal: 8,
+    textAlign: 'center',
   },
-  navItemActive: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 24,
-    paddingHorizontal: 16,
+  dayAvgValue: {
+    width: 64,
+    fontSize: 12,
+    color: '#424242',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  avgText: { marginTop: 4, fontSize: 12, color: '#2E7D32', fontWeight: '600' },
+  chip: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#D0D0D0',
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
   },
-  navLabelActive: {
-    color: '#FFFFFF',
+  chipActive: { borderColor: '#2E7D32', backgroundColor: '#F1F8E9' },
+  chipText: { color: '#555', fontSize: 13, fontWeight: '500' },
+  chipTextActive: { color: '#2E7D32', fontWeight: '700' },
+  predictButton: {
+    backgroundColor: '#2E7D32',
+    borderRadius: 10,
+    alignItems: 'center',
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  predictText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '70%',
+    paddingBottom: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFEF',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E1E1E',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  modalOptionText: {
+    fontSize: 15,
+    color: '#333',
   },
 });
-

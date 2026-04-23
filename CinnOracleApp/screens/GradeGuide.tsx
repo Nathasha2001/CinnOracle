@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../App';
 import { getGrades, GradesResponse } from '../src/api/client';
+import AppBottomNav from '../components/AppBottomNav';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -215,34 +216,7 @@ export default function GradeGuide() {
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
-        <View style={[styles.navItem, styles.navItemActive]}>
-          <MaterialIcons name="home" size={24} color="#FFFFFF" />
-          <Text style={[styles.navLabel, styles.navLabelActive]}>Home</Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('NewAnalysis')}
-        >
-          <MaterialIcons name="analytics" size={24} color="#9E9E9E" />
-          <Text style={styles.navLabel}>Analysis</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('HistoricalTrends')}
-        >
-          <MaterialIcons name="history" size={24} color="#9E9E9E" />
-          <Text style={styles.navLabel}>History</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialIcons name="settings" size={24} color="#9E9E9E" />
-          <Text style={styles.navLabel}>Settings</Text>
-        </TouchableOpacity>
-      </View>
+      <AppBottomNav active="grade" />
     </SafeAreaView>
   );
 }

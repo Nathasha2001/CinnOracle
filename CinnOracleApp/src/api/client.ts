@@ -10,8 +10,8 @@ import Constants from "expo-constants";
 const DEFAULT_PORT = 8000;
 
 // Set this to your current PC LAN IP when testing on a real phone (same Wi‑Fi).
-// From ipconfig: Wi‑Fi = 10.58.54.251; Ethernet = 192.168.98.1, 192.168.174.1
-const LAN_IP: string | null = null;
+// From ipconfig: Wi‑Fi = 192.168.8.186
+const LAN_IP: string | null = "192.168.8.186";
 
 function getBaseUrl() {
   if (Platform.OS === "android") {
@@ -43,25 +43,62 @@ function getBaseUrl() {
 
 const BASE_URL = getBaseUrl();
 
-// ===== Quality Prediction Interfaces =====
-export interface QualityPredictionInput {
-  weight_before: number;
-  weight_after: number;
-  temperature: number;
-  drying_days?: number;
-  color?: string;
-  breakage_level?: string;
-  roll_tightness?: string;
-  aroma_strength?: string;
-  district?: string;
-  harvest_date?: string;
+export type FarmerMoistureMode = "weights" | "moisture_tool";
+
+export interface TemperatureReadingInput {
+  day: number;
+  temp_8am: number;
+  temp_12pm: number;
+  temp_6pm: number;
 }
 
-export interface QualityPredictionResponse {
-  quality: string;
-  standard_grade: string;
-  weight_loss_percent: number;
-  message: string;
+// ===== Unified /predict (FastAPI) =====
+export interface CinnOraclePredictRequest {
+  user_type: "farmer" | "large_scale";
+  weight_before_drying_kg?: number | null;
+  weight_after_drying_kg?: number | null;
+  moisture_percentage?: number | null;
+  farmer_moisture_mode?: FarmerMoistureMode | null;
+  diameter_mm: number;
+  drying_days: number;
+  temperature_readings: TemperatureReadingInput[];
+  color: string;
+  visual_mould: "Yes" | "No";
+  district: string;
+  harvest_quantity_kg: number;
+}
+
+export interface CinnOracleCalculatedValues {
+  estimated_moisture_percentage: number | null;
+  avg_temp_8am_c: number;
+  avg_temp_12pm_c: number;
+  avg_temp_6pm_c: number;
+  overall_average_temperature_c: number;
+}
+
+export interface CinnOraclePredictResponse {
+  predicted_grade: string;
+  predicted_price_per_kg: number;
+  harvest_quantity_kg: number;
+  estimated_total_income: number;
+  district: string;
+  calculated_values: CinnOracleCalculatedValues;
+  recommended_marketplaces: string[];
+}
+
+async function readFastApiError(response: Response): Promise<string> {
+  try {
+    const data: any = await response.json();
+    if (data?.detail) {
+      if (typeof data.detail === "string") return data.detail;
+      if (Array.isArray(data.detail) && data.detail[0]?.msg) {
+        return String(data.detail[0].msg);
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return `Request failed (${response.status})`;
 }
 
 // ===== Price Prediction Interfaces =====
@@ -94,22 +131,26 @@ export interface PricePredictionResponse {
 export interface PredictionRecord {
   _id: string;
   batch_id?: string | null;
+  user_type?: "farmer" | "large_scale" | string;
+  farmer_moisture_mode?: "weights" | "moisture_tool" | string | null;
+  moisture_percentage?: number | null;
   weight_before: number;
   weight_after: number;
   temperature: number;
+  temperature_readings?: { day: number; temp_8am: number; temp_12pm: number; temp_6pm: number }[] | null;
   district: string;
   harvest_date?: string | null;
   drying_days?: number | null;
   color?: string | null;
-  breakage_level?: string | null;
-  roll_tightness?: string | null;
-  aroma_strength?: string | null;
+  visual_mould?: string | null;
   quality_level?: string | null;
   standard_grade?: string | null;
   predicted_quality: string;
   predicted_standard_grade: string;
   weight_loss_percent: number;
   estimated_price?: number | null;
+  estimated_total_income?: number | null;
+  harvest_quantity_kg?: number | null;
   currency: string;
   market_suggestions?: { name: string; description?: string }[] | null;
   reason?: string | null;
@@ -159,24 +200,22 @@ export async function checkHealth() {
   }
 }
 
-// ===== Quality Prediction API =====
-export async function predictQuality(input: QualityPredictionInput): Promise<QualityPredictionResponse> {
-  try {
-    const response = await fetch(`${BASE_URL}/predict`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
+// ===== Unified prediction API =====
+export async function predictCinnOracle(
+  input: CinnOraclePredictRequest
+): Promise<CinnOraclePredictResponse> {
+  const response = await fetch(`${BASE_URL}/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 
-    if (!response.ok) {
-      throw new Error(`Quality prediction failed: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Quality prediction error:", error);
-    throw error;
+  if (!response.ok) {
+    const msg = await readFastApiError(response);
+    throw new Error(msg);
   }
+
+  return await response.json();
 }
 
 // ===== Price Prediction API =====
@@ -252,7 +291,6 @@ export async function deletePrediction(id: string): Promise<void> {
   }
 }
 
-// ===== Legacy function for backward compatibility =====
-export async function predictQualityAndPrice(payload: any) {
-  return predictQuality(payload);
-}
+// Back-compat alias (older screen code)
+export const predictQuality = predictCinnOracle;
+export const predictQualityAndPrice = predictCinnOracle;

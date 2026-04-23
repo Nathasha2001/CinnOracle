@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CinnOracleMain from './screens/CinnOracleMain';
 import NewAnalysis from './screens/NewAnalysis';
-import PricePrediction from './screens/PricePrediction';
+import PricePrediction from './screens/PricePredictionResults';
 import HistoricalTrends from './screens/HistoricalTrends';
 import SavedSuccess from './screens/SavedSuccess';
 import Report from './screens/Report';

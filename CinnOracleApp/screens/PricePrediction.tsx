@@ -16,12 +16,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../App';
-import {
-  predictPrice,
-  PriceInput,
-  PricePredictionResponse,
-  getGrades,
-} from '../src/api/client';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'PricePrediction'>;
 type PricePredictionRouteProp = RouteProp<RootStackParamList, 'PricePrediction'>;
@@ -97,14 +91,26 @@ export default function PricePrediction() {
           ? new Date(result.harvestDate).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0]
       );
+
+      // NewAnalysis -> unified /predict result (no extra price API call)
+      if (typeof result.predictedPricePerKg === 'number') {
+        setEstimatedPrice(result.predictedPricePerKg);
+        setHasEstimated(true);
+        if (Array.isArray(result.recommendedMarketplaces) && result.recommendedMarketplaces.length) {
+          setMarkets(
+            result.recommendedMarketplaces.map((name: string) => ({
+              name,
+              description: 'Suggested by CinnOracle marketplace rules (grade, quantity, district).',
+            }))
+          );
+        } else {
+          const fallback = getReasonAndMarkets();
+          setMarkets(fallback.markets);
+        }
+        setReason('Price and marketplaces were estimated by the CinnOracle backend for your latest analysis inputs.');
+      }
     }
   }, [result]);
-
-  // Call price API when user inputs or quality results change
-  useEffect(() => {
-    // Price API will be called manually when Estimate Price button is clicked
-    // This useEffect is kept for future use if needed
-  }, [gradeInput, districtInput, result?.weight_loss_percent]);
 
   const standardGrade = result?.standardGrade ?? 'C5';
   const qualityLevel = mapGradeToQuality(standardGrade);
@@ -192,38 +198,29 @@ export default function PricePrediction() {
       return;
     }
 
-    try {
-      const payload: PriceInput = {
-        quality_grade: gradeInput || result?.standardGrade || 'C5',
-        district: districtInput,
-        weight_loss_percent: result?.weight_loss_percent,
-        harvest_date: harvestDateInput,
-        quality_level: mapGradeToQuality(gradeInput || result?.standardGrade || 'C5'),
-        standard_grade: standardGrade,
-        weight_before: result?.inputs?.weightBefore,
-        weight_after: result?.inputs?.weightAfter,
-        temperature: result?.inputs?.temperature,
-        batch_id: result?.batchId,
-      };
-      const response: PricePredictionResponse = await predictPrice(payload);
-      setEstimatedPrice(response.price);
-      if (response.market_suggestions) {
-        setMarkets(response.market_suggestions);
+    // If we already have a backend-predicted price, keep it and just refresh UI suggestions.
+    if (typeof result?.predictedPricePerKg === 'number') {
+      setEstimatedPrice(result.predictedPricePerKg);
+      if (Array.isArray(result.recommendedMarketplaces) && result.recommendedMarketplaces.length) {
+        setMarkets(
+          result.recommendedMarketplaces.map((name: string) => ({
+            name,
+            description: 'Suggested by CinnOracle marketplace rules (grade, quantity, district).',
+          }))
+        );
       } else {
         const fallback = getReasonAndMarkets();
         setMarkets(fallback.markets);
       }
-      if (response.reason) {
-        setReason(response.reason);
-      } else {
-        setReason(getReasonAndMarkets().reason);
-      }
+      setReason('Price and marketplaces were estimated by the CinnOracle backend for your latest analysis inputs.');
       setHasEstimated(true);
-    } catch (error) {
-      console.error('Price prediction failed:', error);
-      setEstimatedPrice(null);
-      setHasEstimated(false);
+      return;
     }
+
+    const fallback = getReasonAndMarkets();
+    setMarkets(fallback.markets);
+    setReason(fallback.reason);
+    setHasEstimated(true);
   };
 
   return (
@@ -436,8 +433,14 @@ export default function PricePrediction() {
                       new Date().toISOString(),
                     // original farmer inputs from NewAnalysis
                     inputs: result.inputs,
+                    // calculated values from prediction
+                    calculatedValues: result.calculatedValues,
+                    // harvest quantity and income
+                    harvestQuantityKg: result.harvestQuantityKg,
+                    estimatedTotalIncome: result.estimatedTotalIncome,
                     // marketplace suggestions and reasoning from prediction
                     markets,
+                    recommendedMarketplaces: result.recommendedMarketplaces,
                     reason,
                   },
                 });
