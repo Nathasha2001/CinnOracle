@@ -49,6 +49,17 @@ export default function NewAnalysis() {
   const [harvestQuantityKg, setHarvestQuantityKg] = useState('100');
   const [showDistrictModal, setShowDistrictModal] = useState(false);
 
+  // Error states for real-time validation
+  const [errors, setErrors] = useState<{
+    weightBefore?: string;
+    weightAfter?: string;
+    moistureInput?: string;
+    diameter?: string;
+    dryingDays?: string;
+    temperature?: string;
+    harvestQuantityKg?: string;
+  }>({});
+
   const DISTRICTS = [
     'Badulla',
     'Galle',
@@ -75,6 +86,114 @@ export default function NewAnalysis() {
     return Number.isFinite(n) ? n : 0;
   };
 
+  // Real-time validation helpers
+  const validateWeightBefore = (value: string) => {
+    if (!value) return 'Weight before is required';
+    const num = toNumber(value);
+    if (num <= 0) return 'Weight must be greater than 0';
+    if (num > 10000) return 'Weight must be less than 10000 kg';
+    return '';
+  };
+
+  const validateWeightAfter = (value: string) => {
+    if (!value) return 'Weight after is required';
+    const num = toNumber(value);
+    if (num <= 0) return 'Weight must be greater than 0';
+    if (num > 10000) return 'Weight must be less than 10000 kg';
+    const before = toNumber(weightBefore);
+    if (before > 0 && num >= before) return 'Weight after must be less than weight before';
+    return '';
+  };
+
+  const validateMoisture = (value: string) => {
+    if (!value) return 'Moisture percentage is required';
+    const num = toNumber(value);
+    if (num < 0 || num > 100) return 'Moisture must be between 0-100%';
+    return '';
+  };
+
+  const validateDiameter = (value: string) => {
+    if (!value) return 'Diameter is required';
+    const num = toNumber(value);
+    if (num <= 0) return 'Diameter must be greater than 0';
+    if (num > 20) return 'Diameter must be less than 20 mm';
+    return '';
+  };
+
+  const validateDryingDays = (value: string) => {
+    if (!value) return 'Drying days is required';
+    const num = toNumber(value);
+    if (num < 1 || num > 14) return 'Drying days must be between 1-14';
+    return '';
+  };
+
+  const validateTemperature = (value: string) => {
+    if (!value) return 'Temperature is required';
+    const num = toNumber(value);
+    if (num < 0 || num > 50) return 'Temperature must be between 0-50°C';
+    return '';
+  };
+
+  const validateHarvestQuantity = (value: string) => {
+    if (!value) return 'Harvest quantity is required';
+    const num = toNumber(value);
+    if (num <= 0) return 'Quantity must be greater than 0';
+    if (num > 100000) return 'Quantity must be less than 100000 kg';
+    return '';
+  };
+
+  // Handler functions with validation
+  const handleWeightBeforeChange = (value: string) => {
+    const cleaned = formatNumericInput(value);
+    setWeightBefore(cleaned);
+    setErrors({ ...errors, weightBefore: validateWeightBefore(cleaned) });
+  };
+
+  const handleWeightAfterChange = (value: string) => {
+    const cleaned = formatNumericInput(value);
+    setWeightAfter(cleaned);
+    setErrors({ ...errors, weightAfter: validateWeightAfter(cleaned) });
+  };
+
+  const handleMoistureChange = (value: string) => {
+    const cleaned = formatNumericInput(value);
+    setMoistureInput(cleaned);
+    setErrors({ ...errors, moistureInput: validateMoisture(cleaned) });
+  };
+
+  const handleDiameterChange = (value: string) => {
+    const cleaned = formatNumericInput(value);
+    setDiameter(cleaned);
+    setErrors({ ...errors, diameter: validateDiameter(cleaned) });
+  };
+
+  const handleDryingDaysChange = (value: string) => {
+    const cleaned = formatNumericInput(value);
+    setDryingDays(cleaned);
+    const error = validateDryingDays(cleaned);
+    setErrors({ ...errors, dryingDays: error });
+    const nextDays = Math.max(1, Math.min(14, Math.floor(toNumber(cleaned) || 0)));
+    syncTemperatureDays(nextDays);
+  };
+
+  const handleHarvestQuantityChange = (value: string) => {
+    const cleaned = formatNumericInput(value);
+    setHarvestQuantityKg(cleaned);
+    setErrors({ ...errors, harvestQuantityKg: validateHarvestQuantity(cleaned) });
+  };
+
+  const handleTemperatureChange = (dayIdx: number, period: 'morning' | 'noon' | 'evening', value: string) => {
+    const cleaned = formatNumericInput(value);
+    const error = validateTemperature(cleaned);
+    setTemperatureDays((prev) => {
+      const next = [...prev];
+      next[dayIdx] = { ...next[dayIdx], [period]: cleaned };
+      return next;
+    });
+    setErrors({ ...errors, temperature: error });
+  };
+
+
   const dryingDaysNum = Math.max(1, Math.min(14, Math.floor(toNumber(dryingDays) || 0)));
   const estimatedMoisture = useMemo(() => {
     const before = toNumber(weightBefore);
@@ -98,10 +217,7 @@ export default function NewAnalysis() {
   };
 
   const onChangeDryingDays = (value: string) => {
-    const cleaned = formatNumericInput(value);
-    setDryingDays(cleaned);
-    const nextDays = Math.max(1, Math.min(14, Math.floor(toNumber(cleaned) || 0)));
-    syncTemperatureDays(nextDays);
+    handleDryingDaysChange(value);
   };
 
   const averageTemperature = useMemo(() => {
@@ -121,45 +237,56 @@ export default function NewAnalysis() {
   };
 
   const validate = () => {
+    const newErrors: typeof errors = {};
+
+    // Validate diameter
     if (!diameter || toNumber(diameter) <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid diameter.');
-      return false;
+      newErrors.diameter = 'Diameter is required';
+    } else if (toNumber(diameter) > 20) {
+      newErrors.diameter = 'Diameter must be less than 20 mm';
     }
+
+    // Validate harvest quantity
     if (!harvestQuantityKg || toNumber(harvestQuantityKg) <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid harvest quantity (kg).');
-      return false;
+      newErrors.harvestQuantityKg = 'Harvest quantity is required';
+    } else if (toNumber(harvestQuantityKg) > 100000) {
+      newErrors.harvestQuantityKg = 'Harvest quantity must be less than 100000 kg';
     }
+
+    // Validate drying days
     if (!dryingDays || toNumber(dryingDays) <= 0) {
-      Alert.alert('Validation Error', 'Please enter valid drying days.');
-      return false;
+      newErrors.dryingDays = 'Drying days is required';
+    } else if (toNumber(dryingDays) > 14) {
+      newErrors.dryingDays = 'Drying days must be between 1-14';
     }
+
+    // Validate temperature for all days
     const hasInvalidTemp = temperatureDays.some(
       (d) => toNumber(d.morning) <= 0 || toNumber(d.noon) <= 0 || toNumber(d.evening) <= 0,
     );
     if (hasInvalidTemp) {
-      Alert.alert('Validation Error', 'Please enter temperature for every drying day.');
-      return false;
+      newErrors.temperature = 'Please enter valid temperature for every drying day (0-50°C)';
     }
 
+    // Validate user-specific inputs
     if (userType === 'Farmer Level' && toolType === 'Without Tool') {
       const before = toNumber(weightBefore);
       const after = toNumber(weightAfter);
       if (before <= 0 || after <= 0) {
-        Alert.alert('Validation Error', 'Please enter weight before and weight after drying.');
-        return false;
-      }
-      if (after >= before) {
-        Alert.alert('Validation Error', 'Weight after drying must be less than weight before drying.');
-        return false;
+        newErrors.weightBefore = 'Both weights are required';
+      } else if (after >= before) {
+        newErrors.weightAfter = 'Weight after must be less than weight before';
       }
     } else {
       if (!moistureInput || toNumber(moistureInput) <= 0) {
-        Alert.alert('Validation Error', 'Please enter moisture percentage.');
-        return false;
+        newErrors.moistureInput = 'Moisture percentage is required';
+      } else if (toNumber(moistureInput) > 100) {
+        newErrors.moistureInput = 'Moisture must be between 0-100%';
       }
     }
 
-    return true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handlePredict = async () => {
@@ -281,7 +408,11 @@ export default function NewAnalysis() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         <Text style={styles.sectionTag}>1. Select User Type</Text>
         <View style={styles.row}>
           {(['Farmer Level', 'Large Scale'] as UserType[]).map((type) => (
@@ -320,20 +451,24 @@ export default function NewAnalysis() {
           <View style={styles.card}>
             <Text style={styles.label}>Weight Before Drying (kg)</Text>
             <TextInput
-              style={styles.input}
-              keyboardType="numeric"
+              style={[styles.input, errors.weightBefore ? styles.inputError : null]}
+              keyboardType="decimal-pad"
               value={weightBefore}
-              onChangeText={(v) => setWeightBefore(formatNumericInput(v))}
+              onChangeText={handleWeightBeforeChange}
               placeholder="Enter weight before drying"
             />
+            {errors.weightBefore && <Text style={styles.errorText}>{errors.weightBefore}</Text>}
+            
             <Text style={styles.label}>Weight After Drying (kg)</Text>
             <TextInput
-              style={styles.input}
-              keyboardType="numeric"
+              style={[styles.input, errors.weightAfter ? styles.inputError : null]}
+              keyboardType="decimal-pad"
               value={weightAfter}
-              onChangeText={(v) => setWeightAfter(formatNumericInput(v))}
+              onChangeText={handleWeightAfterChange}
               placeholder="Enter weight after drying"
             />
+            {errors.weightAfter && <Text style={styles.errorText}>{errors.weightAfter}</Text>}
+            
             {estimatedMoisture !== null && (
               <>
                 <Text style={styles.label}>Moisture Percentage (%)</Text>
@@ -347,12 +482,13 @@ export default function NewAnalysis() {
           <View style={styles.card}>
             <Text style={styles.label}>Moisture Percentage (%)</Text>
             <TextInput
-              style={styles.input}
-              keyboardType="numeric"
+              style={[styles.input, errors.moistureInput ? styles.inputError : null]}
+              keyboardType="decimal-pad"
               value={moistureInput}
-              onChangeText={(v) => setMoistureInput(formatNumericInput(v))}
-              placeholder="Enter moisture percentage"
+              onChangeText={handleMoistureChange}
+              placeholder="Enter moisture percentage (0-100)"
             />
+            {errors.moistureInput && <Text style={styles.errorText}>{errors.moistureInput}</Text>}
           </View>
         )}
 
@@ -360,21 +496,23 @@ export default function NewAnalysis() {
           <Text style={styles.sectionTag}>3. Cinnamon Details</Text>
           <Text style={styles.label}>Diameter (mm)</Text>
           <TextInput
-            style={styles.input}
-            keyboardType="numeric"
+            style={[styles.input, errors.diameter ? styles.inputError : null]}
+            keyboardType="decimal-pad"
             value={diameter}
-            onChangeText={(v) => setDiameter(formatNumericInput(v))}
-            placeholder="Enter diameter"
+            onChangeText={handleDiameterChange}
+            placeholder="Enter diameter (0.5-20 mm)"
           />
+          {errors.diameter && <Text style={styles.errorText}>{errors.diameter}</Text>}
 
           <Text style={styles.label}>Drying Days</Text>
           <TextInput
-            style={styles.input}
-            keyboardType="numeric"
+            style={[styles.input, errors.dryingDays ? styles.inputError : null]}
+            keyboardType="decimal-pad"
             value={dryingDays}
-            onChangeText={onChangeDryingDays}
-            placeholder="Enter drying days"
+            onChangeText={handleDryingDaysChange}
+            placeholder="Enter drying days (1-14)"
           />
+          {errors.dryingDays && <Text style={styles.errorText}>{errors.dryingDays}</Text>}
         </View>
 
         <View style={styles.card}>
@@ -390,47 +528,30 @@ export default function NewAnalysis() {
             <View key={`day-${idx}`} style={styles.tempRow}>
               <Text style={styles.dayLabel}>Day {idx + 1}</Text>
               <TextInput
-                style={[styles.input, styles.tempInput]}
-                keyboardType="numeric"
+                style={[styles.input, styles.tempInput, errors.temperature ? styles.inputError : null]}
+                keyboardType="decimal-pad"
                 value={value.morning}
-                onChangeText={(v) =>
-                  setTemperatureDays((prev) => {
-                    const next = [...prev];
-                    next[idx] = { ...next[idx], morning: formatNumericInput(v) };
-                    return next;
-                  })
-                }
+                onChangeText={(v) => handleTemperatureChange(idx, 'morning', v)}
                 placeholder="°C"
               />
               <TextInput
-                style={[styles.input, styles.tempInput]}
-                keyboardType="numeric"
+                style={[styles.input, styles.tempInput, errors.temperature ? styles.inputError : null]}
+                keyboardType="decimal-pad"
                 value={value.noon}
-                onChangeText={(v) =>
-                  setTemperatureDays((prev) => {
-                    const next = [...prev];
-                    next[idx] = { ...next[idx], noon: formatNumericInput(v) };
-                    return next;
-                  })
-                }
+                onChangeText={(v) => handleTemperatureChange(idx, 'noon', v)}
                 placeholder="°C"
               />
               <TextInput
-                style={[styles.input, styles.tempInput]}
-                keyboardType="numeric"
+                style={[styles.input, styles.tempInput, errors.temperature ? styles.inputError : null]}
+                keyboardType="decimal-pad"
                 value={value.evening}
-                onChangeText={(v) =>
-                  setTemperatureDays((prev) => {
-                    const next = [...prev];
-                    next[idx] = { ...next[idx], evening: formatNumericInput(v) };
-                    return next;
-                  })
-                }
+                onChangeText={(v) => handleTemperatureChange(idx, 'evening', v)}
                 placeholder="°C"
               />
               <Text style={styles.dayAvgValue}>{dayAverage(value) > 0 ? `${dayAverage(value)}°C` : '—'}</Text>
             </View>
           ))}
+          {errors.temperature && <Text style={styles.errorText}>{errors.temperature}</Text>}
           <Text style={styles.avgText}>
             Overall Average Temperature: {averageTemperature > 0 ? `${averageTemperature} °C` : 'Auto calculated'}
           </Text>
@@ -483,12 +604,13 @@ export default function NewAnalysis() {
           <Text style={styles.sectionTag}>8. Harvest quantity</Text>
           <Text style={styles.label}>Total harvest quantity (kg)</Text>
           <TextInput
-            style={styles.input}
-            keyboardType="numeric"
+            style={[styles.input, errors.harvestQuantityKg ? styles.inputError : null]}
+            keyboardType="decimal-pad"
             value={harvestQuantityKg}
-            onChangeText={(v) => setHarvestQuantityKg(formatNumericInput(v))}
+            onChangeText={handleHarvestQuantityChange}
             placeholder="e.g. 100"
           />
+          {errors.harvestQuantityKg && <Text style={styles.errorText}>{errors.harvestQuantityKg}</Text>}
         </View>
 
         <TouchableOpacity style={styles.predictButton} onPress={handlePredict}>
@@ -586,6 +708,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
     color: '#1E1E1E',
+  },
+  inputError: {
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFEBEE',
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 12,
+    marginBottom: 8,
+    marginTop: -4,
+    fontWeight: '500',
   },
   dropdownInput: {
     flexDirection: 'row',
