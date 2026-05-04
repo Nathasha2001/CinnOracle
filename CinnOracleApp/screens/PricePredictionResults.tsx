@@ -21,8 +21,9 @@ type PricePredictionRouteProp = RouteProp<RootStackParamList, 'PricePrediction'>
 const mapGradeToQuality = (grade?: string | null): string => {
   if (!grade) return 'Low Quality';
   const g = grade.trim().toUpperCase();
-  if (g === 'ALBA' || g === 'C5 SPECIAL' || g === 'C5') return 'High Quality';
-  if (g === 'C4' || g === 'H1') return 'Medium Quality';
+  if (g === 'ALBA' || g === 'C5 SPECIAL') return 'High Quality';
+  if (g === 'C5' || g === 'C4') return 'Medium Quality';
+  if (g === 'H1' || g === 'H2' || g === 'GOROSU') return 'Low Quality';
   return 'Low Quality';
 };
 
@@ -37,13 +38,14 @@ export default function PricePredictionResults() {
   const harvestQty = Number(result?.inputs?.harvestQuantityKg || 0);
   const totalIncome = Number(result?.estimatedTotalIncome || pricePerKg * harvestQty || 0);
   const district = result?.district || 'Galle';
+  const farmerScale = result?.farmer_scale || 'Farmer Level';
   const calculated = result?.calculatedValues || {};
   const marketplaces: string[] = Array.isArray(result?.recommendedMarketplaces)
     ? result.recommendedMarketplaces
     : [];
 
   const calculatedRows = [
-    { label: 'Estimated Moisture Percentage', value: calculated?.estimated_moisture_percentage },
+    { label: 'Moisture Percentage', value: calculated?.moisture_percentage },
     { label: 'Average Temperature (8 AM)', value: calculated?.avg_temp_8am_c },
     { label: 'Average Temperature (12 PM)', value: calculated?.avg_temp_12pm_c },
     { label: 'Average Temperature (6 PM)', value: calculated?.avg_temp_6pm_c },
@@ -86,7 +88,7 @@ export default function PricePredictionResults() {
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Harvest Quantity</Text>
             <Text style={styles.statValue}>{harvestQty} kg</Text>
-            <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}><Text style={[styles.badgeText, { color: '#8D6E63' }]}>From New Analysis</Text></View>
+            <View style={[styles.badge, { backgroundColor: '#FFF8E1' }]}><Text style={[styles.badgeText, { color: '#8D6E63' }]}>{farmerScale}</Text></View>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Estimated Total Income</Text>

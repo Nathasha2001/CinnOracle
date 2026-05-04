@@ -19,39 +19,23 @@ function getBaseUrl() {
     (Constants.expoConfig?.extra as { BACKEND_URL?: string } | undefined) ??
     (Constants.manifest?.extra as { BACKEND_URL?: string } | undefined)
   );
-  const overrideUrl =
-    expoExtra?.BACKEND_URL || (process.env.BACKEND_URL as string | undefined);
+  const overrideUrl = expoExtra?.BACKEND_URL || (process.env.BACKEND_URL as string | undefined);
   if (overrideUrl) {
     return overrideUrl;
   }
 
-  if (Platform.OS === "android") {
-    // Android Emulator: host machine localhost is 10.0.2.2
-    // Android Physical device: must use your laptop LAN IP
-    if (Constants.isDevice) {
-      return LAN_IP ? `http://${LAN_IP}:${DEFAULT_PORT}` : `http://localhost:${DEFAULT_PORT}`;
-    }
-    return `http://10.0.2.2:${DEFAULT_PORT}`;
-  }
-
-  if (Platform.OS === "ios") {
-    // iOS simulator: localhost works.
-    // Physical device: use your laptop LAN IP.
-    if (Constants.isDevice) {
-      return LAN_IP ? `http://${LAN_IP}:${DEFAULT_PORT}` : `http://localhost:${DEFAULT_PORT}`;
-    }
-    return `http://localhost:${DEFAULT_PORT}`;
-  }
-
+  // If on web, use current hostname
   if (Platform.OS === "web") {
     const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
     return `http://${hostname || "localhost"}:${DEFAULT_PORT}`;
   }
 
+  // For Mobile (iOS/Android), always use the hardcoded LAN_IP if available
   if (LAN_IP) {
     return `http://${LAN_IP}:${DEFAULT_PORT}`;
   }
 
+  // Fallback
   return `http://localhost:${DEFAULT_PORT}`;
 }
 
@@ -68,6 +52,7 @@ export interface TemperatureReadingInput {
 
 // ===== Unified /predict (FastAPI) =====
 export interface CinnOraclePredictRequest {
+  has_moisture_tool: boolean;
   user_type: "farmer" | "large_scale";
   weight_before_drying_kg?: number | null;
   weight_after_drying_kg?: number | null;
@@ -83,7 +68,7 @@ export interface CinnOraclePredictRequest {
 }
 
 export interface CinnOracleCalculatedValues {
-  estimated_moisture_percentage: number | null;
+  moisture_percentage: number | null;
   avg_temp_8am_c: number;
   avg_temp_12pm_c: number;
   avg_temp_6pm_c: number;
@@ -95,9 +80,13 @@ export interface CinnOraclePredictResponse {
   predicted_price_per_kg: number;
   harvest_quantity_kg: number;
   estimated_total_income: number;
+  farmer_scale: string;
+  quantity_category: string;
   district: string;
   calculated_values: CinnOracleCalculatedValues;
   recommended_marketplaces: string[];
+  prediction_id?: string | null;
+  timestamp?: string | null;
 }
 
 async function readFastApiError(response: Response): Promise<string> {
@@ -144,32 +133,37 @@ export interface PricePredictionResponse {
 // ===== Prediction History Interfaces =====
 export interface PredictionRecord {
   _id: string;
+  prediction_id?: string | null;
+  timestamp?: string | null;
+  predicted_grade: string;
+  predicted_price_per_kg: number;
+  estimated_total_income: number;
+  harvest_quantity_kg: number;
+  farmer_scale: string;
+  quantity_category: string;
+  district: string;
   batch_id?: string | null;
   user_type?: "farmer" | "large_scale" | string;
   farmer_moisture_mode?: "weights" | "moisture_tool" | string | null;
   moisture_percentage?: number | null;
-  weight_before: number;
-  weight_after: number;
-  temperature: number;
+  weight_before?: number;
+  weight_after?: number;
+  temperature?: number;
   temperature_readings?: { day: number; temp_8am: number; temp_12pm: number; temp_6pm: number }[] | null;
-  district: string;
-  harvest_date?: string | null;
   drying_days?: number | null;
   color?: string | null;
   visual_mould?: string | null;
   quality_level?: string | null;
   standard_grade?: string | null;
-  predicted_quality: string;
-  predicted_standard_grade: string;
-  weight_loss_percent: number;
+  predicted_quality?: string;
+  predicted_standard_grade?: string;
+  weight_loss_percent?: number;
   estimated_price?: number | null;
-  estimated_total_income?: number | null;
-  harvest_quantity_kg?: number | null;
-  currency: string;
+  currency?: string;
   market_suggestions?: { name: string; description?: string }[] | null;
   reason?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PredictionHistoryResponse {
@@ -275,7 +269,7 @@ export async function getPredictions(
 ): Promise<PredictionHistoryResponse> {
   try {
     const response = await fetch(
-      `${BASE_URL}/predictions?limit=${limit}&skip=${skip}`
+      `${BASE_URL}/history?limit=${limit}&skip=${skip}`
     );
 
     if (!response.ok) {
@@ -292,7 +286,7 @@ export async function getPredictions(
 // ===== Delete Prediction API =====
 export async function deletePrediction(id: string): Promise<void> {
   try {
-    const response = await fetch(`${BASE_URL}/predictions/${id}`, {
+    const response = await fetch(`${BASE_URL}/history/${id}`, {
       method: "DELETE",
     });
 

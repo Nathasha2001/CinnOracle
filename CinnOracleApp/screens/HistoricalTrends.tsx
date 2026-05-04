@@ -74,9 +74,9 @@ export default function HistoricalTrends() {
     const q = search.trim().toLowerCase();
     if (!q) return history;
     return history.filter((item) => {
-      const grade = (item.standard_grade || item.predicted_standard_grade || '').toLowerCase();
+      const grade = (item.predicted_grade || '').toLowerCase();
       const district = (item.district || '').toLowerCase();
-      const date = formatDateTime(item.harvest_date || item.created_at).toLowerCase();
+      const date = formatDateTime(item.timestamp || item.created_at).toLowerCase();
       return grade.includes(q) || district.includes(q) || date.includes(q);
     });
   }, [history, search]);
@@ -84,17 +84,15 @@ export default function HistoricalTrends() {
   const stats = useMemo(() => {
     const totalPredictions = filtered.length;
     const highQualityCount = filtered.filter((item) => {
-      const quality = item.quality_level || mapGradeToQuality(item.standard_grade || item.predicted_standard_grade);
+      const quality = item.quality_level || mapGradeToQuality(item.predicted_grade);
       return quality.toLowerCase().includes('high');
     }).length;
     const totalEstimatedIncome = filtered.reduce((sum, item) => {
-      const qty = Number(item.weight_after || 0);
-      const price = Number(item.estimated_price || 0);
-      return sum + qty * price;
+      return sum + Number(item.estimated_total_income || 0);
     }, 0);
     const avgPrice =
       filtered.length > 0
-        ? filtered.reduce((sum, item) => sum + Number(item.estimated_price || 0), 0) / filtered.length
+        ? filtered.reduce((sum, item) => sum + Number(item.predicted_price_per_kg || 0), 0) / filtered.length
         : 0;
 
     return {
@@ -172,15 +170,15 @@ export default function HistoricalTrends() {
         {!loading &&
           !error &&
           filtered.map((item) => {
-            const quality = item.quality_level || mapGradeToQuality(item.standard_grade || item.predicted_standard_grade);
-            const grade = item.standard_grade || item.predicted_standard_grade || '—';
+            const quality = item.quality_level || mapGradeToQuality(item.predicted_grade);
+            const grade = item.predicted_grade || '—';
             const tag = qualityTagColor(quality);
-            const dateLabel = formatDateTime(item.harvest_date || item.created_at);
-            const quantity = Number((item as any).harvest_quantity_kg || item.weight_after || 0);
-            const price = Number(item.estimated_price || 0);
-            const totalIncome = price * quantity;
-            const userType = (item.user_type || '').toLowerCase() === 'large_scale' ? 'Large Scale' : 'Farmer Level';
-            const batchId = item.batch_id || item._id;
+            const dateLabel = formatDateTime(item.timestamp || item.created_at);
+            const quantity = Number(item.harvest_quantity_kg || 0);
+            const price = Number(item.predicted_price_per_kg || 0);
+            const totalIncome = Number(item.estimated_total_income || 0);
+            const userType = (item.farmer_scale || item.user_type || '').toLowerCase() === 'large_scale' ? 'Large Scale' : 'Farmer Level';
+            const batchId = item.prediction_id || item._id;
 
             return (
               <View key={item._id} style={styles.historyCard}>
@@ -190,37 +188,12 @@ export default function HistoricalTrends() {
                   onPress={() => {
                     navigation.navigate('Report', {
                       batchData: {
-                        batchId,
+                        ...item,
+                        batchId: item.prediction_id || item._id,
                         qualityLevel: quality,
                         standardGrade: grade,
-                        price: item.estimated_price,
-                        district: item.district,
-                        date: item.harvest_date || item.created_at,
-                        harvestQuantityKg: item.harvest_quantity_kg,
-                        estimatedTotalIncome: item.estimated_total_income,
-                        inputs: {
-                          weightBefore: item.weight_before,
-                          weightAfter: item.weight_after,
-                          temperature: item.temperature,
-                          dryingDays: item.drying_days,
-                          cinnamonColor: item.color,
-                          visualMould: item.visual_mould,
-                          moisture: item.moisture_percentage,
-                          moistureMode: item.farmer_moisture_mode,
-                          diameter: item.diameter_mm,
-                          harvestQuantityKg: item.harvest_quantity_kg,
-                          temperatureReadings: item.temperature_readings,
-                        },
-                        calculatedValues: {
-                          estimated_moisture_percentage: item.estimated_moisture_percentage,
-                          avg_temp_8am_c: item.avg_temp_8am_c,
-                          avg_temp_12pm_c: item.avg_temp_12pm_c,
-                          avg_temp_6pm_c: item.avg_temp_6pm_c,
-                          overall_average_temperature_c: item.temperature,
-                        },
-                        markets: item.market_suggestions || undefined,
-                        recommendedMarketplaces: item.market_suggestions?.map((m: any) => m.name) || [],
-                        reason: item.reason || undefined,
+                        price: item.predicted_price_per_kg,
+                        date: item.timestamp || item.created_at,
                       },
                     });
                   }}
@@ -255,37 +228,12 @@ export default function HistoricalTrends() {
                     onPress={() => {
                       navigation.navigate('Report', {
                         batchData: {
-                          batchId,
+                          ...item,
+                          batchId: item.prediction_id || item._id,
                           qualityLevel: quality,
                           standardGrade: grade,
-                          price: item.estimated_price,
-                          district: item.district,
-                          date: item.harvest_date || item.created_at,
-                          harvestQuantityKg: item.harvest_quantity_kg,
-                          estimatedTotalIncome: item.estimated_total_income,
-                          inputs: {
-                            weightBefore: item.weight_before,
-                            weightAfter: item.weight_after,
-                            temperature: item.temperature,
-                            dryingDays: item.drying_days,
-                            cinnamonColor: item.color,
-                            visualMould: item.visual_mould,
-                            moisture: item.moisture_percentage,
-                            moistureMode: item.farmer_moisture_mode,
-                            diameter: item.diameter_mm,
-                            harvestQuantityKg: item.harvest_quantity_kg,
-                            temperatureReadings: item.temperature_readings,
-                          },
-                          calculatedValues: {
-                            estimated_moisture_percentage: item.estimated_moisture_percentage,
-                            avg_temp_8am_c: item.avg_temp_8am_c,
-                            avg_temp_12pm_c: item.avg_temp_12pm_c,
-                            avg_temp_6pm_c: item.avg_temp_6pm_c,
-                            overall_average_temperature_c: item.temperature,
-                          },
-                          markets: item.market_suggestions || undefined,
-                          recommendedMarketplaces: item.market_suggestions?.map((m: any) => m.name) || [],
-                          reason: item.reason || undefined,
+                          price: item.predicted_price_per_kg,
+                          date: item.timestamp || item.created_at,
                         },
                       });
                     }}

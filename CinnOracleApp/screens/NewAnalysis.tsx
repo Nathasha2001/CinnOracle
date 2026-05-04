@@ -316,7 +316,8 @@ export default function NewAnalysis() {
     }));
 
     const payload: CinnOraclePredictRequest = {
-      user_type: backendUserType,
+      has_moisture_tool: toolType === 'With Tool',
+      user_type: 'farmer',
       diameter_mm: toNumber(diameter),
       drying_days: dryingDaysNum,
       temperature_readings,
@@ -376,6 +377,7 @@ export default function NewAnalysis() {
           estimatedTotalIncome: prediction.estimated_total_income,
           recommendedMarketplaces: prediction.recommended_marketplaces,
           calculatedValues: prediction.calculated_values,
+          farmer_scale: prediction.farmer_scale,
           inputs: {
             weightBefore: displayWeightBefore,
             weightAfter: displayWeightAfter,
@@ -413,39 +415,20 @@ export default function NewAnalysis() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        <Text style={styles.sectionTag}>1. Select User Type</Text>
+        <Text style={styles.sectionTag}>1. Moisture (Select Option)</Text>
         <View style={styles.row}>
-          {(['Farmer Level', 'Large Scale'] as UserType[]).map((type) => (
+          {(['With Tool', 'Without Tool'] as ToolType[]).map((type) => (
             <TouchableOpacity
               key={type}
-              style={[styles.optionCard, userType === type && styles.optionCardActive]}
-              onPress={() => setUserType(type)}
+              style={[styles.optionCard, toolType === type && styles.optionCardActive]}
+              onPress={() => setToolType(type)}
             >
-              <Text style={[styles.optionTitle, userType === type && styles.optionTitleActive]}>
+              <Text style={[styles.optionTitle, toolType === type && styles.optionTitleActive]}>
                 {type}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-
-        {userType !== 'Large Scale' && (
-          <>
-            <Text style={styles.sectionTag}>2. Moisture (Select Option)</Text>
-            <View style={styles.row}>
-              {(['With Tool', 'Without Tool'] as ToolType[]).map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[styles.optionCard, toolType === type && styles.optionCardActive]}
-                  onPress={() => setToolType(type)}
-                >
-                  <Text style={[styles.optionTitle, toolType === type && styles.optionTitleActive]}>
-                    {type}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
 
         {userType === 'Farmer Level' && toolType === 'Without Tool' ? (
           <View style={styles.card}>
@@ -493,7 +476,7 @@ export default function NewAnalysis() {
         )}
 
         <View style={styles.card}>
-          <Text style={styles.sectionTag}>3. Cinnamon Details</Text>
+          <Text style={styles.sectionTag}>2. Cinnamon Details</Text>
           <Text style={styles.label}>Diameter (mm)</Text>
           <TextInput
             style={[styles.input, errors.diameter ? styles.inputError : null]}
@@ -516,7 +499,7 @@ export default function NewAnalysis() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTag}>4. Temperature (°C)</Text>
+          <Text style={styles.sectionTag}>3. Temperature (°C)</Text>
           <View style={styles.tempHeaderRow}>
             <Text style={styles.tempHeaderDay}>Day</Text>
             <Text style={styles.tempHeaderCol}>8 AM</Text>
@@ -558,7 +541,7 @@ export default function NewAnalysis() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTag}>5. Color</Text>
+          <Text style={styles.sectionTag}>4. Color</Text>
           <View style={styles.rowWrap}>
             {(['Light Brown', 'Golden Brown', 'Dark Brown'] as ColorType[]).map((c) => (
               <TouchableOpacity
@@ -573,7 +556,7 @@ export default function NewAnalysis() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTag}>6. Visual Mould</Text>
+          <Text style={styles.sectionTag}>5. Visual Mould</Text>
           <View style={styles.row}>
             {(['Yes', 'No'] as MouldType[]).map((m) => (
               <TouchableOpacity
@@ -590,7 +573,7 @@ export default function NewAnalysis() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTag}>7. District</Text>
+          <Text style={styles.sectionTag}>6. District</Text>
           <TouchableOpacity
             style={[styles.input, styles.dropdownInput]}
             onPress={() => setShowDistrictModal(true)}
@@ -601,7 +584,7 @@ export default function NewAnalysis() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTag}>8. Harvest quantity</Text>
+          <Text style={styles.sectionTag}>7. Harvest quantity</Text>
           <Text style={styles.label}>Total harvest quantity (kg)</Text>
           <TextInput
             style={[styles.input, errors.harvestQuantityKg ? styles.inputError : null]}

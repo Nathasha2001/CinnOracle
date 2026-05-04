@@ -27,17 +27,17 @@ const mapGradeToQuality = (grade?: string | null): string => {
   const g = grade.trim().toUpperCase();
 
   // High quality: Alba, C5 Special, C5
-  if (g === 'ALBA' || g === 'C5 SPECIAL' || g === 'C5') {
+  if (g === 'ALBA' || g === 'C5 SPECIAL') {
     return 'High Quality';
   }
 
   // Medium quality: C4, H1
-  if (g === 'C4' || g === 'H1') {
+  if (g === 'C5' || g === 'C4') {
     return 'Medium Quality';
   }
 
   // Low quality: H2, HEEN, GOROSU (and anything else not explicitly mapped)
-  if (g === 'H2' || g === 'HEEN' || g === 'GOROSU') {
+  if (g === 'H1' || g === 'H2' || g === 'GOROSU') {
     return 'Low Quality';
   }
 

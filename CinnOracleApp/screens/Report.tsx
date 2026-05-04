@@ -63,13 +63,13 @@ export default function Report() {
   const quality = batchData?.qualityLevel || mapGradeToQuality(grade);
   const district = batchData?.district || 'Galle District';
   const userType = batchData?.inputs?.moistureMode === 'moisture_tool' ? 'Large Scale' : 'Farmer Level';
-  const pricePerKg = Number(batchData?.price || 0);
-  const harvestQty = Number(batchData?.inputs?.harvestQuantityKg || batchData?.inputs?.weightAfter || 0);
-  const totalIncome = Number(batchData?.estimatedTotalIncome || pricePerKg * harvestQty || 0);
+  const pricePerKg = Number(batchData?.price || batchData?.predicted_price_per_kg || 0);
+  const harvestQty = Number(batchData?.harvestQuantityKg || batchData?.harvest_quantity_kg || batchData?.inputs?.harvest_quantity_kg || 0);
+  const totalIncome = Number(batchData?.estimatedTotalIncome || batchData?.estimated_total_income || pricePerKg * harvestQty || 0);
   const batchId = batchData?.batchId || `#PRD-${new Date().getFullYear()}-00024`;
-  const calculated = batchData?.calculatedValues || {};
-  const markets = (batchData?.markets || batchData?.recommendedMarketplaces || []).map((m: any) =>
-    typeof m === 'string' ? { name: m, description: '' } : m
+  const calculated = batchData?.calculatedValues || batchData?.calculated_values || {};
+  const markets = (batchData?.markets || batchData?.recommendedMarketplaces || batchData?.recommended_marketplaces || []).map((m: any) =>
+    typeof m === "string" ? { name: m, description: "" } : m
   );
   const dateStr = batchData?.date
     ? new Date(batchData.date).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -343,19 +343,19 @@ export default function Report() {
         <div class="info-box">
           <div class="info-row">
             <span class="info-label">Diameter:</span>
-            <span class="info-value">${batchData?.inputs?.diameter ?? '—'} mm</span>
+            <span class="info-value">${batchData?.inputs?.diameter ?? batchData?.inputs?.diameter_mm ?? '—'} mm</span>
           </div>
           <div class="info-row">
             <span class="info-label">Drying Days:</span>
-            <span class="info-value">${batchData?.inputs?.dryingDays ?? '—'} days</span>
+            <span class="info-value">${batchData?.inputs?.dryingDays ?? batchData?.inputs?.drying_days ?? '—'} days</span>
           </div>
           <div class="info-row">
             <span class="info-label">Cinnamon Color:</span>
-            <span class="info-value">${batchData?.inputs?.cinnamonColor ?? '—'}</span>
+            <span class="info-value">${batchData?.inputs?.cinnamonColor ?? batchData?.inputs?.color ?? '—'}</span>
           </div>
           <div class="info-row">
             <span class="info-label">Visual Mould:</span>
-            <span class="info-value">${batchData?.inputs?.visualMould ?? '—'}</span>
+            <span class="info-value">${batchData?.inputs?.visualMould ?? batchData?.inputs?.visual_mould ?? '—'}</span>
           </div>
         </div>
       </div>
@@ -366,7 +366,7 @@ export default function Report() {
         <div class="info-box">
           <div class="info-row">
             <span class="info-label">Estimated Moisture:</span>
-            <span class="info-value">${calculated.estimated_moisture_percentage ?? 'N/A'} %</span>
+            <span class="info-value">${calculated.estimated_moisture_percentage ?? calculated.moisture_percentage ?? 'N/A'} %</span>
           </div>
           <div class="info-row">
             <span class="info-label">Temperature (8 AM):</span>
@@ -492,7 +492,7 @@ export default function Report() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Calculated Values</Text>
-          <View style={styles.dataRow}><Text style={styles.dataLabel}>Estimated Moisture Percentage</Text><Text style={styles.dataValue}>{calculated.estimated_moisture_percentage ?? 'N/A'} %</Text></View>
+          <View style={styles.dataRow}><Text style={styles.dataLabel}>Estimated Moisture Percentage</Text><Text style={styles.dataValue}>{calculated.estimated_moisture_percentage ?? calculated.moisture_percentage ?? 'N/A'} %</Text></View>
           <View style={styles.dataRow}><Text style={styles.dataLabel}>Average Temperature (8 AM)</Text><Text style={styles.dataValue}>{calculated.avg_temp_8am_c ?? '—'} °C</Text></View>
           <View style={styles.dataRow}><Text style={styles.dataLabel}>Average Temperature (12 PM)</Text><Text style={styles.dataValue}>{calculated.avg_temp_12pm_c ?? '—'} °C</Text></View>
           <View style={styles.dataRow}><Text style={styles.dataLabel}>Average Temperature (6 PM)</Text><Text style={styles.dataValue}>{calculated.avg_temp_6pm_c ?? '—'} °C</Text></View>
@@ -501,10 +501,10 @@ export default function Report() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Input Summary</Text>
-          <View style={styles.dataRow}><Text style={styles.dataLabel}>Diameter</Text><Text style={styles.dataValue}>{batchData?.inputs?.diameter ?? '—'} mm</Text></View>
-          <View style={styles.dataRow}><Text style={styles.dataLabel}>Drying Days</Text><Text style={styles.dataValue}>{batchData?.inputs?.dryingDays ?? '—'} Days</Text></View>
-          <View style={styles.dataRow}><Text style={styles.dataLabel}>Color</Text><Text style={styles.dataValue}>{batchData?.inputs?.cinnamonColor ?? '—'}</Text></View>
-          <View style={[styles.dataRow, styles.noBorder]}><Text style={styles.dataLabel}>Visual Mould</Text><Text style={styles.dataValue}>{batchData?.inputs?.visualMould ?? '—'}</Text></View>
+          <View style={styles.dataRow}><Text style={styles.dataLabel}>Diameter</Text><Text style={styles.dataValue}>{batchData?.inputs?.diameter ?? batchData?.inputs?.diameter_mm ?? '—'} mm</Text></View>
+          <View style={styles.dataRow}><Text style={styles.dataLabel}>Drying Days</Text><Text style={styles.dataValue}>{batchData?.inputs?.dryingDays ?? batchData?.inputs?.drying_days ?? '—'} Days</Text></View>
+          <View style={styles.dataRow}><Text style={styles.dataLabel}>Color</Text><Text style={styles.dataValue}>{batchData?.inputs?.cinnamonColor ?? batchData?.inputs?.color ?? '—'}</Text></View>
+          <View style={[styles.dataRow, styles.noBorder]}><Text style={styles.dataLabel}>Visual Mould</Text><Text style={styles.dataValue}>{batchData?.inputs?.visualMould ?? batchData?.inputs?.visual_mould ?? '—'}</Text></View>
         </View>
 
         <View style={styles.card}>

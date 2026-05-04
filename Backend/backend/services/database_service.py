@@ -1,52 +1,62 @@
-from __future__ import annotations
-
-import logging
 import os
-from typing import Optional
-
 from pymongo import MongoClient
-from pymongo.server_api import ServerApi
+from bson import ObjectId
+from dotenv import load_dotenv
 
-_client: Optional[MongoClient] = None
-_db_name = "CinnOracle"
-logger = logging.getLogger(__name__)
+load_dotenv()
 
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/cinnoracle")
+DATABASE_NAME = os.getenv("DATABASE_NAME", "CinnOracle")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "predictions")
 
-def get_mongodb_uri() -> str:
-    return os.getenv("MONGODB_URI", "mongodb+srv://savinditharu611_db_user:wslaZtglj66H3HWl@cluster0.cxhs9bs.mongodb.net/?appName=Cluster0").strip()
+_client = None
 
-
-def connect_to_mongodb() -> Optional[MongoClient]:
+def get_db():
     global _client
-    if _client is not None:
-        return _client
+    if _client is None:
+        print(f"Attempting to connect to MongoDB with URI: {MONGODB_URI}")
+        # Use a short timeout so it doesn't hang the app
+        _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
+    return _client[DATABASE_NAME]
 
-    uri = get_mongodb_uri()
-    if not uri:
-        logger.warning("MONGODB_URI environment variable not set")
-        return None
+def get_collection():
+    return get_db()[COLLECTION_NAME]
 
+def save_prediction(prediction_data: dict):
+    collection = get_collection()
+    result = collection.insert_one(prediction_data)
+    return str(result.inserted_id)
+
+def get_history():
+    collection = get_collection()
+    history = list(collection.find().sort("timestamp", -1))
+    for item in history:
+        item["_id"] = str(item["_id"])
+    return history
+
+def get_prediction_by_id(prediction_id: str):
     try:
-        logger.info("Connecting to MongoDB...")
-        _client = MongoClient(uri, server_api=ServerApi("1"), serverSelectionTimeoutMS=5000)
-        _client.admin.command("ping")
-        logger.info("Successfully connected to MongoDB")
-        return _client
+        collection = get_collection()
+        item = collection.find_one({"_id": ObjectId(prediction_id)})
+        if item:
+            item["_id"] = str(item["_id"])
+        return item
+    except:
+        return None
+
+def delete_prediction(prediction_id: str):
+    try:
+        collection = get_collection()
+        result = collection.delete_one({"_id": ObjectId(prediction_id)})
+        return result.deleted_count > 0
+    except:
+        return False
+
+def is_db_connected():
+    try:
+        client = get_db().client
+        client.admin.command('ping')
+        return True
     except Exception as e:
-        logger.error("Failed to connect to MongoDB: %s", e)
-        _client = None
-        return None
-
-
-def get_database():
-    client = connect_to_mongodb()
-    if client is None:
-        return None
-    return client[_db_name]
-
-
-def close_mongodb_connection() -> None:
-    global _client
-    if _client is not None:
-        _client.close()
-        _client = None
+        print(f"Database connection error: {e}")
+        return False
