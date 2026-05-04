@@ -8,8 +8,6 @@ import {
   StatusBar,
   ScrollView,
   Alert,
-  ActivityIndicator,
-  FlatList,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -18,7 +16,6 @@ import type { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../App';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { getPredictions, type PredictionRecord } from '../src/api/client';
 import AppBottomNav from '../components/AppBottomNav';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Report'>;
@@ -35,29 +32,6 @@ export default function Report() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ReportRouteProp>();
   const { batchData } = route.params ?? { batchData: null };
-  const [predictions, setPredictions] = useState<PredictionRecord[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
-
-  // Fetch all predictions from backend on component mount
-  useEffect(() => {
-    fetchPredictionHistory();
-  }, []);
-
-  const fetchPredictionHistory = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await getPredictions(100, 0);
-      setPredictions(response.predictions);
-    } catch (err) {
-      console.error('Failed to fetch predictions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch predictions');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const grade = batchData?.standardGrade || batchData?.quality || 'C5';
   const quality = batchData?.qualityLevel || mapGradeToQuality(grade);
@@ -343,19 +317,19 @@ export default function Report() {
         <div class="info-box">
           <div class="info-row">
             <span class="info-label">Diameter:</span>
-            <span class="info-value">${batchData?.inputs?.diameter ?? batchData?.inputs?.diameter_mm ?? '—'} mm</span>
+            <span class="info-value">${batchData?.inputs?.diameter ?? batchData?.inputs?.diameter_mm ?? batchData?.diameter_mm ?? '—'} mm</span>
           </div>
           <div class="info-row">
             <span class="info-label">Drying Days:</span>
-            <span class="info-value">${batchData?.inputs?.dryingDays ?? batchData?.inputs?.drying_days ?? '—'} days</span>
+            <span class="info-value">${batchData?.inputs?.dryingDays ?? batchData?.inputs?.drying_days ?? batchData?.drying_days ?? '—'} days</span>
           </div>
           <div class="info-row">
             <span class="info-label">Cinnamon Color:</span>
-            <span class="info-value">${batchData?.inputs?.cinnamonColor ?? batchData?.inputs?.color ?? '—'}</span>
+            <span class="info-value">${batchData?.inputs?.cinnamonColor ?? batchData?.inputs?.color ?? batchData?.color ?? '—'}</span>
           </div>
           <div class="info-row">
             <span class="info-label">Visual Mould:</span>
-            <span class="info-value">${batchData?.inputs?.visualMould ?? batchData?.inputs?.visual_mould ?? '—'}</span>
+            <span class="info-value">${batchData?.inputs?.visualMould ?? batchData?.inputs?.visual_mould ?? batchData?.visual_mould ?? '—'}</span>
           </div>
         </div>
       </div>
@@ -438,25 +412,7 @@ export default function Report() {
         </TouchableOpacity>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'current' && styles.tabActive]}
-          onPress={() => setActiveTab('current')}
-        >
-          <Text style={[styles.tabText, activeTab === 'current' && styles.tabTextActive]}>Current Report</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'history' && styles.tabActive]}
-          onPress={() => setActiveTab('history')}
-        >
-          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
-            All Predictions ({predictions.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      {activeTab === 'current' && (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
           <View style={styles.topGradeRow}>
@@ -501,10 +457,10 @@ export default function Report() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Input Summary</Text>
-          <View style={styles.dataRow}><Text style={styles.dataLabel}>Diameter</Text><Text style={styles.dataValue}>{batchData?.inputs?.diameter ?? batchData?.inputs?.diameter_mm ?? '—'} mm</Text></View>
-          <View style={styles.dataRow}><Text style={styles.dataLabel}>Drying Days</Text><Text style={styles.dataValue}>{batchData?.inputs?.dryingDays ?? batchData?.inputs?.drying_days ?? '—'} Days</Text></View>
-          <View style={styles.dataRow}><Text style={styles.dataLabel}>Color</Text><Text style={styles.dataValue}>{batchData?.inputs?.cinnamonColor ?? batchData?.inputs?.color ?? '—'}</Text></View>
-          <View style={[styles.dataRow, styles.noBorder]}><Text style={styles.dataLabel}>Visual Mould</Text><Text style={styles.dataValue}>{batchData?.inputs?.visualMould ?? batchData?.inputs?.visual_mould ?? '—'}</Text></View>
+          <View style={styles.dataRow}><Text style={styles.dataLabel}>Diameter</Text><Text style={styles.dataValue}>{batchData?.inputs?.diameter ?? batchData?.inputs?.diameter_mm ?? batchData?.diameter_mm ?? '—'} mm</Text></View>
+          <View style={styles.dataRow}><Text style={styles.dataLabel}>Drying Days</Text><Text style={styles.dataValue}>{batchData?.inputs?.dryingDays ?? batchData?.inputs?.drying_days ?? batchData?.drying_days ?? '—'} Days</Text></View>
+          <View style={styles.dataRow}><Text style={styles.dataLabel}>Color</Text><Text style={styles.dataValue}>{batchData?.inputs?.cinnamonColor ?? batchData?.inputs?.color ?? batchData?.color ?? '—'}</Text></View>
+          <View style={[styles.dataRow, styles.noBorder]}><Text style={styles.dataLabel}>Visual Mould</Text><Text style={styles.dataValue}>{batchData?.inputs?.visualMould ?? batchData?.inputs?.visual_mould ?? batchData?.visual_mould ?? '—'}</Text></View>
         </View>
 
         <View style={styles.card}>
@@ -526,73 +482,6 @@ export default function Report() {
           <Text style={styles.downloadText}>Download Report</Text>
         </TouchableOpacity>
       </ScrollView>
-      )}
-
-      {activeTab === 'history' && (
-        <View style={styles.historyContainer}>
-          {loading ? (
-            <View style={styles.centerContent}>
-              <ActivityIndicator size="large" color="#0B5E2D" />
-              <Text style={styles.loadingText}>Loading predictions...</Text>
-            </View>
-          ) : error ? (
-            <View style={styles.centerContent}>
-              <Ionicons name="alert-circle-outline" size={48} color="#E74C3C" />
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={fetchPredictionHistory}>
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : predictions.length === 0 ? (
-            <View style={styles.centerContent}>
-              <Ionicons name="folder-open-outline" size={48} color="#999" />
-              <Text style={styles.emptyText}>No predictions saved yet</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={predictions}
-              keyExtractor={(item) => item._id}
-              renderItem={({ item }) => (
-                <View style={styles.predictionCard}>
-                  <View style={styles.predictionHeader}>
-                    <View>
-                      <Text style={styles.predictionGrade}>{item.predicted_quality}</Text>
-                      <Text style={styles.predictionDate}>
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.predictionBadge}>
-                      <Text style={styles.predictionBadgeText}>{item.quality_level}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.predictionRow}>
-                    <Text style={styles.predictionLabel}>Batch ID</Text>
-                    <Text style={styles.predictionValue}>{item.batch_id}</Text>
-                  </View>
-                  <View style={styles.predictionRow}>
-                    <Text style={styles.predictionLabel}>District</Text>
-                    <Text style={styles.predictionValue}>{item.district}</Text>
-                  </View>
-                  <View style={styles.predictionRow}>
-                    <Text style={styles.predictionLabel}>Harvest Quantity</Text>
-                    <Text style={styles.predictionValue}>{item.harvest_quantity_kg} kg</Text>
-                  </View>
-                  <View style={styles.predictionRow}>
-                    <Text style={styles.predictionLabel}>Price per kg</Text>
-                    <Text style={styles.predictionValue}>Rs. {item.estimated_price?.toLocaleString()}</Text>
-                  </View>
-                  <View style={[styles.predictionRow, styles.noBorder]}>
-                    <Text style={styles.predictionLabel}>Total Income</Text>
-                    <Text style={styles.predictionValueBold}>Rs. {(item.harvest_quantity_kg * (item.estimated_price || 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
-                  </View>
-                </View>
-              )}
-              scrollEnabled={true}
-            />
-          )}
-        </View>
-      )}
       <AppBottomNav active="history" />
     </SafeAreaView>
   );
@@ -600,140 +489,6 @@ export default function Report() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F4F3' },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E6E6E6',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: '#0B5E2D',
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#757575',
-  },
-  tabTextActive: {
-    color: '#0B5E2D',
-    fontWeight: '700',
-  },
-  historyContainer: {
-    flex: 1,
-    backgroundColor: '#F2F4F3',
-  },
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#E74C3C',
-    textAlign: 'center',
-  },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#0B5E2D',
-    borderRadius: 6,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  predictionCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 12,
-    marginVertical: 6,
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E6E6E6',
-  },
-  predictionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  predictionGrade: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0B5E2D',
-  },
-  predictionDate: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 4,
-  },
-  predictionBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  predictionBadgeText: {
-    color: '#2E7D32',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  predictionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-  },
-  noBorder: {
-    borderBottomWidth: 0,
-  },
-  predictionLabel: {
-    fontSize: 12,
-    color: '#666',
-    flex: 1,
-  },
-  predictionValue: {
-    fontSize: 12,
-    color: '#1E1E1E',
-    fontWeight: '600',
-    textAlign: 'right',
-    flex: 1,
-  },
-  predictionValueBold: {
-    fontSize: 13,
-    color: '#0B5E2D',
-    fontWeight: '700',
-    textAlign: 'right',
-    flex: 1,
-  },
   header: {
     backgroundColor: '#0B5E2D',
     paddingHorizontal: 14,

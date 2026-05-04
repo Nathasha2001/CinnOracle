@@ -100,21 +100,21 @@ export default function CinnOracleMain() {
           <View style={styles.qualityRow}>
             <View style={styles.qualityInfo}>
               <Text style={styles.qualityTitle}>High Quality</Text>
-              <Text style={styles.desc}>Alba, C5 Special, C5</Text>
+              <Text style={styles.desc}>Alba, C5 Special</Text>
             </View>
           </View>
 
           <View style={styles.qualityRow}>
             <View style={styles.qualityInfo}>
               <Text style={styles.qualityTitle}>Medium Quality</Text>
-              <Text style={styles.desc}>C4, H1</Text>
+              <Text style={styles.desc}>C5, C4</Text>
             </View>
           </View>
 
           <View style={[styles.qualityRow, styles.qualityRowLast]}>
             <View style={styles.qualityInfo}>
               <Text style={styles.qualityTitle}>Low Quality</Text>
-              <Text style={styles.desc}>H2, Heen, Gorosu</Text>
+              <Text style={styles.desc}>H1, H2, Gorosu</Text>
             </View>
           </View>
         </View>

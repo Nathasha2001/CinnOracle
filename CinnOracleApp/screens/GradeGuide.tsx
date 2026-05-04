@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,41 +7,17 @@ import {
   SafeAreaView,
   ScrollView,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../App';
-import { getGrades, GradesResponse } from '../src/api/client';
 import AppBottomNav from '../components/AppBottomNav';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function GradeGuide() {
   const navigation = useNavigation<NavigationProp>();
-  const [gradesData, setGradesData] = useState<GradesResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchGrades = async () => {
-      try {
-        setIsLoading(true);
-        const data = await getGrades();
-        setGradesData(data);
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch grades:', err);
-        setError('Failed to load grades data');
-        // Keep showing the page with fallback data
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchGrades();
-  }, []);
 
   const renderGradeCard = (
     title: string,
@@ -90,51 +66,33 @@ export default function GradeGuide() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8B4513" />
-            <Text style={styles.loadingText}>Loading grades information...</Text>
-          </View>
-        )}
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Text style={styles.errorSubtext}>Showing default information</Text>
-          </View>
-        )}
         {/* High Quality Section */}
         <View style={styles.sectionHeaderRow}>
           <View style={[styles.qualityDot, styles.highDot]} />
           <View style={styles.sectionHeaderText}>
             <Text style={styles.sectionTitle}>High Quality</Text>
             <Text style={styles.sectionDescription}>
-              These grades have the best appearance and highest market price.
+              These grades have the best appearance, lowest moisture, and highest export value.
             </Text>
           </View>
         </View>
 
-        {renderGradeCard('Alba', 'Highest quality cinnamon', [
-          'Very thin sticks (quills)',
-          'Light golden color',
-          'Very tightly rolled',
-          'Strong aroma',
-          'Usually sold to export markets',
-          'Gets the highest price',
+        {renderGradeCard('Alba', 'Highest premium cinnamon', [
+          'Very thin quills (6–8 mm)',
+          'Light golden color (light brown)',
+          'Very tightly rolled layers',
+          'Strong, sweet aroma',
+          'Export-grade cinnamon',
+          'Highest market price',
         ])}
 
-        {renderGradeCard('C5 Special', 'Very good quality cinnamon', [
-          'Thin sticks',
-          'Light golden color',
-          'Low breakage',
+        {renderGradeCard('C5 Special', 'Premium quality cinnamon', [
+          'Thin quills (8–10 mm)',
+          'Light golden to light brown color',
+          'Low breakage and smooth texture',
           'Good aroma',
           'High export demand',
-        ])}
-
-        {renderGradeCard('C5', 'Good quality cinnamon', [
-          'Slightly thicker than premium grades',
-          'Good color and aroma',
-          'Suitable for export and local markets',
+          'High market price',
         ])}
 
         {/* Medium Quality Section */}
@@ -143,23 +101,27 @@ export default function GradeGuide() {
           <View style={styles.sectionHeaderText}>
             <Text style={styles.sectionTitle}>Medium Quality</Text>
             <Text style={styles.sectionDescription}>
-              These grades have moderate quality and fair market price.
+              These grades have moderate thickness and are used in both export and local markets.
             </Text>
           </View>
         </View>
 
-        {renderGradeCard('C4', 'Medium quality cinnamon', [
-          'Slightly thicker sticks',
+        {renderGradeCard('C5', 'Moderate quality cinnamon', [
+          'Medium thickness (10–12 mm)',
           'Golden brown color',
           'Moderate aroma',
-          'Stable market price',
+          'Slightly higher breakage',
+          'Used for both export and local markets',
+          'Moderate market price',
         ])}
 
-        {renderGradeCard('H1', 'Lower medium grade', [
-          'Thicker sticks',
-          'Less uniform rolls',
-          'More breakage than higher grades',
-          'Lower price than premium grades',
+        {renderGradeCard('C4', 'Standard quality cinnamon', [
+          'Thicker quills (12–16 mm)',
+          'Golden to slightly dark brown color',
+          'Average aroma',
+          'More breakage compared to premium grades',
+          'Common in local markets',
+          'Stable market price',
         ])}
 
         {/* Low Quality Section */}
@@ -168,27 +130,34 @@ export default function GradeGuide() {
           <View style={styles.sectionHeaderText}>
             <Text style={styles.sectionTitle}>Low Quality</Text>
             <Text style={styles.sectionDescription}>
-              These grades usually have lower market prices and are often used
-              for processing.
+              These grades have thicker bark, lower aroma, and are mainly used for processing.
             </Text>
           </View>
         </View>
 
-        {renderGradeCard('H2', 'Thick cinnamon sticks', [
-          'More broken pieces',
+        {renderGradeCard('H1', 'Low quality cinnamon', [
+          'Thick sticks (16–22 mm)',
+          'Dark brown color',
+          'Less uniform rolling',
           'Lower aroma',
+          'Higher breakage',
           'Lower market price',
         ])}
 
-        {renderGradeCard('Heen', 'Thin broken cinnamon pieces', [
-          'Often used for cinnamon powder production',
-          'Mixed color and aroma',
-          'Not usually sold as whole sticks',
+        {renderGradeCard('H2', 'Very low quality cinnamon', [
+          'Very thick sticks (22–26 mm)',
+          'Dark brown color',
+          'High breakage',
+          'Weak aroma',
+          'Mostly used for processing',
         ])}
 
-        {renderGradeCard('Gorosu', 'Very thick and rough bark', [
-          'Lowest quality grade',
-          'Mostly used for industrial processing',
+        {renderGradeCard('Gorosu', 'Lowest quality cinnamon', [
+          'Very thick bark (26mm+)',
+          'Rough texture',
+          'Very low aroma',
+          'Not suitable for export as quills',
+          'Used for industrial processing (powder/oil)',
         ])}
 
         {/* How CinnOracle Helps */}
@@ -404,34 +373,6 @@ const styles = StyleSheet.create({
   },
   navLabelActive: {
     color: '#FFFFFF',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#757575',
-    marginTop: 12,
-  },
-  errorContainer: {
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F44336',
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#C62828',
-    fontWeight: '600',
-  },
-  errorSubtext: {
-    fontSize: 11,
-    color: '#E57373',
-    marginTop: 4,
   },
 });
 

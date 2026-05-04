@@ -116,7 +116,7 @@ export default function NewAnalysis() {
     if (!value) return 'Diameter is required';
     const num = toNumber(value);
     if (num <= 0) return 'Diameter must be greater than 0';
-    if (num > 20) return 'Diameter must be less than 20 mm';
+    if (num > 100) return 'Diameter must be less than 100 mm';
     return '';
   };
 
@@ -242,8 +242,8 @@ export default function NewAnalysis() {
     // Validate diameter
     if (!diameter || toNumber(diameter) <= 0) {
       newErrors.diameter = 'Diameter is required';
-    } else if (toNumber(diameter) > 20) {
-      newErrors.diameter = 'Diameter must be less than 20 mm';
+    } else if (toNumber(diameter) > 100) {
+      newErrors.diameter = 'Diameter must be less than 100 mm';
     }
 
     // Validate harvest quantity
