@@ -8,3 +8,4 @@ numpy==2.2.1
 scikit-learn==1.6.0
 python-multipart==0.0.20
 pymongo==4.10.1
+reportlab
